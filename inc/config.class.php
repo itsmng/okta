@@ -163,14 +163,14 @@ class PluginOktaConfig extends CommonDBTM {
       $newUser = new User();
 
       foreach ($distantUsers as $user) {
-        if ($user['status'] !== 'ACTIVE') continue;
+        if ($user['status'] != 'ACTIVE') continue;
 
         $userObject = [];
         $userName = $user['profile'][$OidcMappings['name']];
         $ID = array_search($userName, $localNames);
 
         foreach ($OidcMappings as $key => $value) {
-            $userObject[$value] = $user['profile'][$value] ?? null;
+            $userObject[$key] = $user['profile'][$value] ?? null;
         };
 
         // get user id from local by name
@@ -179,21 +179,21 @@ class PluginOktaConfig extends CommonDBTM {
            $rule = new RuleRightCollection();
            $input = [
                 'authtype' => Auth::EXTERNAL,
-                'name' => $userObject[$OidcMappings['name']],
+                'name' => $userObject['name'],
                 '_extauth' => 1,
                 'add' => 1
              ];
            $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
               'type'   => Auth::EXTERNAL,
-              'email'  => $userObject["emails"] ?? '',
+              'email'  => $userObject["email"] ?? '',
               'login'  => $input["name"]
            ]);
            $input['_ruleright_process'] = true;
 
            $ID = $newUser->add($input);
         }
+        Oidc::addUserData($user['profile'], $ID);
       }
-      Oidc::addUserData($userObject, $ID);
       return true;
    }
 
