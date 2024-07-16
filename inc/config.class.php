@@ -128,7 +128,10 @@ class PluginOktaConfig extends CommonDBTM {
            ]
         ];
         $context = stream_context_create($opts);
-        $response = file_get_contents($url . "/api/v1/groups?q=" . $group, false, $context);
+        $response = @file_get_contents($url . "/api/v1/groups?q=" . $group, false, $context);
+        if (!$response || count(json_decode($response, true)) == 0) {
+            return false;
+        }
         $groupId = json_decode($response, true)[0]['id'];
         return $groupId;
    }
@@ -139,6 +142,7 @@ class PluginOktaConfig extends CommonDBTM {
        $key = $values['key'];
 
        $groupId = self::getGroupId();
+       if (!$groupId) return false;
 
        $opts = [
           'http' => [
@@ -149,7 +153,10 @@ class PluginOktaConfig extends CommonDBTM {
           ]
        ];
        $context = stream_context_create($opts);
-       $response = file_get_contents($url . "/api/v1/groups/" . $groupId . "/users", false, $context);
+       $response = @file_get_contents($url . "/api/v1/groups/" . $groupId . "/users", false, $context);
+       if (!$response || count(json_decode($response, true)) == 0) {
+            return false;
+       }
        return json_decode($response, true);
    }
 
@@ -157,10 +164,12 @@ class PluginOktaConfig extends CommonDBTM {
       global $DB;
 
       $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
-      $distantUsers = self::fetchUserInGroup();
       $localUsers = iterator_to_array($DB->query("SELECT * FROM glpi_users"));
       $localNames = array_combine(array_column($localUsers, 'id'), array_column($localUsers, 'name'));
       $newUser = new User();
+      $distantUsers = self::fetchUserInGroup();
+
+      if (!$distantUsers) return false;
 
       foreach ($distantUsers as $user) {
         if ($user['status'] != 'ACTIVE') continue;
