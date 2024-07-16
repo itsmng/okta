@@ -103,9 +103,12 @@ class PluginOktaConfig extends CommonDBTM {
 
        foreach ($fields as $key => $value) {
            if (!isset($values[$key])) continue;
+           if ($key == 'key') {
+               $value = Toolbox::sodiumEncrypt($value);
+           }
            $query = <<<SQL
               UPDATE $table
-              SET value='{$values[$key]}'
+              SET value='{$value}'
               WHERE name='{$key}'
            SQL;
            $DB->query($query);
@@ -116,7 +119,7 @@ class PluginOktaConfig extends CommonDBTM {
    static private function getGroupId() {
         $values = self::getConfigValues();
         $url = $values['url'];
-        $key = $values['key'];
+        $key = Toolbox::sodiumDecrypt($values['key']);
         $group = $values['group'];
 
         $opts = [
@@ -139,7 +142,7 @@ class PluginOktaConfig extends CommonDBTM {
    static function fetchUserInGroup() {
        $values = self::getConfigValues();
        $url = $values['url'];
-       $key = $values['key'];
+       $key = Toolbox::sodiumDecrypt($values['key']);
 
        $groupId = self::getGroupId();
        if (!$groupId) return false;
@@ -220,6 +223,8 @@ class PluginOktaConfig extends CommonDBTM {
        $action = self::getFormURL();
        $csrf = Session::getNewCSRFToken();
 
+       $key = Toolbox::sodiumDecrypt($fields['key']);
+
        echo <<<HTML
         <form class="first-bloc" method="post" action="{$action}">
             <table class="tab_cadre">
@@ -233,7 +238,7 @@ class PluginOktaConfig extends CommonDBTM {
                     </tr>
                     <tr>
                         <td>API key</td>
-                        <td><input type="text" name="key" value="{$fields['key']}"></td>
+                        <td><input type="text" name="key" value="{$key}"></td>
                     </tr>
                     <tr>
                         <td>Group name</td>
