@@ -42,10 +42,10 @@ if (!defined("PLUGIN_OKTA_WEB_DIR")) {
 function plugin_init_okta() {
     global $PLUGIN_HOOKS;
 
-    $PLUGIN_HOOKS['csrf_compliant']['okta'] = true;
-    $PLUGIN_HOOKS['change_profile']['okta'] = array('PluginOktaProfile', 'changeProfile');
+    $PLUGIN_HOOKS['csrf_compliant']['whitelabel'] = true;
+    $PLUGIN_HOOKS['change_profile']['whitelabel'] = array('PluginOktaProfile', 'changeProfile');
 
-    Plugin::registerClass('PluginOktaProfile', array('addtabon' => array('Profile')));
+    Plugin::registerClass('PluginOktaProfile', ['addtabon' => array('Profile')]);
 
     if (Session::haveRight("profile", UPDATE)) {
         $PLUGIN_HOOKS['config_page']['okta'] = 'front/config.form.php';

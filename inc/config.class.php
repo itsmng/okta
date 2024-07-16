@@ -76,19 +76,85 @@ class PluginOktaConfig extends CommonDBTM {
       return true;
    }
 
+   static private function getConfigValues() {
+       global $DB;
+
+       $table = self::getTable();
+
+       $query = <<<SQL
+          SELECT name, value from $table
+       SQL;
+
+       $results = iterator_to_array($DB->query($query));
+
+       foreach($results as $id => $result) {
+          $results[$result['name']] = $result['value'];
+          unset($results[$id]);
+       }
+       return $results;
+   }
+
+   static function updateConfigValues($values) {
+       global $DB;
+
+       $table = self::getTable();
+       $fields = self::getConfigValues();
+
+
+       foreach ($fields as $key => $value) {
+           if (!isset($values[$key])) continue;
+           $query = <<<SQL
+              UPDATE $table
+              SET value='{$values[$key]}'
+              WHERE name='{$key}'
+           SQL;
+           $DB->query($query);
+       }
+       return true;
+   }
+
     /**
      * Displays the configuration page for the plugin
      *
      * @return void
      */
     public function showConfigForm() {
-        if (!Session::haveRight("plugin_okta_config",UPDATE)) {
-            return false;
-        }
+       if (!Session::haveRight("plugin_okta_config",UPDATE)) {
+           return false;
+       }
+
+       $fields = self::getConfigValues();
+       $action = self::getFormURL();
+       $csrf = Session::getNewCSRFToken();
 
        echo <<<HTML
-        <form>
-            coucou
+        <form class="first-bloc" method="post" action="{$action}">
+            <table class="tab_cadre">
+                <tbody>
+                    <tr>
+                        <th colspan="2">Okta API Configuration</th>
+                    </tr>
+                    <tr>
+                        <td>API endpoint</td>
+                        <td><input type="text" name="url" value="{$fields['url']}"></td>
+                    </tr>
+                    <tr>
+                        <td>API key</td>
+                        <td><input type="text" name="key" value="{$fields['key']}"></td>
+                    </tr>
+                    <tr>
+                        <td>Group name</td>
+                        <td><input type="text" name="group" value="{$fields['group']}"></td>
+                    </tr>
+                    <tr>
+                        <td class="center" colspan="2">
+                            <input type="submit" name="update" class="submit" value="Save">
+                            <input type="submit" class="submit" value="Import">
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <input type="hidden" name="_glpi_csrf_token" value="$csrf">
         </form>
        HTML; 
     }
