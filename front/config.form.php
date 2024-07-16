@@ -36,9 +36,15 @@ $plugin = new Plugin();
 
 if($plugin->isActivated("okta")) {
     $config = new PluginOktaConfig();
-    if(isset($_POST["update"])) {
+    if(isset($_POST["update"]) || isset($_POST["import"])) {
         Session::checkRight("plugin_okta_config", UPDATE);
         $config::updateConfigValues($_POST);
+        if (isset($_POST["import"])) {
+            $config::importUsers();
+            Session::addMessageAfterRedirect(__('Users imported successfully'), 'okta');
+        } else {
+            Session::addMessageAfterRedirect(__('Settings updated successfully'), 'okta');
+        };
     }
 
     Html::header("Okta", $_SERVER["PHP_SELF"], "config", Plugin::class);

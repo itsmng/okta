@@ -113,6 +113,90 @@ class PluginOktaConfig extends CommonDBTM {
        return true;
    }
 
+   static private function getGroupId() {
+        $values = self::getConfigValues();
+        $url = $values['url'];
+        $key = $values['key'];
+        $group = $values['group'];
+
+        $opts = [
+           'http' => [
+               'method'  => 'GET',
+               'header'  => "Accept: application/json\r\n" .
+                            "Content-Type: application/json\r\n" .
+                            "Authorization: SSWS " . $key,
+           ]
+        ];
+        $context = stream_context_create($opts);
+        $response = file_get_contents($url . "/api/v1/groups?q=" . $group, false, $context);
+        $groupId = json_decode($response, true)[0]['id'];
+        return $groupId;
+   }
+
+   static function fetchUserInGroup() {
+       $values = self::getConfigValues();
+       $url = $values['url'];
+       $key = $values['key'];
+
+       $groupId = self::getGroupId();
+
+       $opts = [
+          'http' => [
+              'method'  => 'GET',
+              'header'  => "Accept: application/json\r\n" .
+                           "Content-Type: application/json\r\n" .
+                           "Authorization: SSWS " . $key,
+          ]
+       ];
+       $context = stream_context_create($opts);
+       $response = file_get_contents($url . "/api/v1/groups/" . $groupId . "/users", false, $context);
+       return json_decode($response, true);
+   }
+
+   static function importUsers() {
+      global $DB;
+
+      $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
+      $distantUsers = self::fetchUserInGroup();
+      $localUsers = iterator_to_array($DB->query("SELECT * FROM glpi_users"));
+      $localNames = array_combine(array_column($localUsers, 'id'), array_column($localUsers, 'name'));
+      $newUser = new User();
+
+      foreach ($distantUsers as $user) {
+        if ($user['status'] !== 'ACTIVE') continue;
+
+        $userObject = [];
+        $userName = $user['profile'][$OidcMappings['name']];
+        $ID = array_search($userName, $localNames);
+
+        foreach ($OidcMappings as $key => $value) {
+            $userObject[$value] = $user['profile'][$value] ?? null;
+        };
+
+        // get user id from local by name
+
+        if (!$ID) {
+           $rule = new RuleRightCollection();
+           $input = [
+                'authtype' => Auth::EXTERNAL,
+                'name' => $userObject[$OidcMappings['name']],
+                '_extauth' => 1,
+                'add' => 1
+             ];
+           $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
+              'type'   => Auth::EXTERNAL,
+              'email'  => $userObject["emails"] ?? '',
+              'login'  => $input["name"]
+           ]);
+           $input['_ruleright_process'] = true;
+
+           $ID = $newUser->add($input);
+        }
+      }
+      Oidc::addUserData($userObject, $ID);
+      return true;
+   }
+
     /**
      * Displays the configuration page for the plugin
      *
@@ -149,7 +233,7 @@ class PluginOktaConfig extends CommonDBTM {
                     <tr>
                         <td class="center" colspan="2">
                             <input type="submit" name="update" class="submit" value="Save">
-                            <input type="submit" class="submit" value="Import">
+                            <input type="submit" name="import" class="submit" value="Import">
                         </td>
                     </tr>
                 </tbody>
