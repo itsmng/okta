@@ -115,52 +115,53 @@ class PluginOktaConfig extends CommonDBTM {
        }
        return true;
    }
-
-   static private function getGroupId() {
-        $values = self::getConfigValues();
-        $url = $values['url'];
-        $key = Toolbox::sodiumDecrypt($values['key']);
-        $group = $values['group'];
-
+   static private function request($url, $key, $method = 'GET', $body = null) {
         $opts = [
            'http' => [
-               'method'  => 'GET',
+               'method'  => $method,
                'header'  => "Accept: application/json\r\n" .
                             "Content-Type: application/json\r\n" .
                             "Authorization: SSWS " . $key,
            ]
         ];
+        if ($body) {
+            $opts['http']['content'] = $body;
+        }
         $context = stream_context_create($opts);
-        $response = @file_get_contents($url . "/api/v1/groups?q=" . $group, false, $context);
-        if (!$response || count(json_decode($response, true)) == 0) {
+        $response = @file_get_contents($url, false, $context);
+        $jsonResponse = json_decode($response, true);
+        if (!$response || count($jsonResponse) == 0) {
+            Session::addMessageAfterRedirect(__('Error connecting to Okta API'), 'error');
+            return false;
+        } else if (isset($jsonResponse['errorCode'])) {
+            Session::addMessageAfterRedirect(__('invalid API key'), 'error');
             return false;
         }
-        $groupId = json_decode($response, true)[0]['id'];
-        return $groupId;
+        return $jsonResponse;
    }
 
-   static function fetchUserInGroup() {
+   static function testConnection() {
+        $values = self::getConfigValues();
+        $url = $values['url'];
+        $key = Toolbox::sodiumDecrypt($values['key']);
+
+        return self::request($url . "/api/v1/groups", $key);
+   }
+
+   static function fetchUserById($id) {
        $values = self::getConfigValues();
        $url = $values['url'];
        $key = Toolbox::sodiumDecrypt($values['key']);
 
-       $groupId = self::getGroupId();
-       if (!$groupId) return false;
+       return self::request($url . "/api/v1/users/" . $id . "/users", $key);
+   }
 
-       $opts = [
-          'http' => [
-              'method'  => 'GET',
-              'header'  => "Accept: application/json\r\n" .
-                           "Content-Type: application/json\r\n" .
-                           "Authorization: SSWS " . $key,
-          ]
-       ];
-       $context = stream_context_create($opts);
-       $response = @file_get_contents($url . "/api/v1/groups/" . $groupId . "/users", false, $context);
-       if (!$response || count(json_decode($response, true)) == 0) {
-            return false;
-       }
-       return json_decode($response, true);
+   static function getUsersInGroup($group) {
+       $values = self::getConfigValues();
+       $url = $values['url'];
+       $key = Toolbox::sodiumDecrypt($values['key']);
+
+       return self::request($url . "/api/v1/groups/" . $group . "/users", $key);
    }
 
    static function importUsers() {
@@ -170,7 +171,7 @@ class PluginOktaConfig extends CommonDBTM {
       $localUsers = iterator_to_array($DB->query("SELECT * FROM glpi_users"));
       $localNames = array_combine(array_column($localUsers, 'id'), array_column($localUsers, 'name'));
       $newUser = new User();
-      $distantUsers = self::fetchUserInGroup();
+      $distantUsers = [];
 
       if (!$distantUsers) return false;
 
@@ -223,6 +224,8 @@ class PluginOktaConfig extends CommonDBTM {
        $action = self::getFormURL();
        $csrf = Session::getNewCSRFToken();
 
+       $groups = self::testConnection();
+
        $key = Toolbox::sodiumDecrypt($fields['key']);
 
        echo "<div class='first-bloc'>";
@@ -246,36 +249,75 @@ class PluginOktaConfig extends CommonDBTM {
                                 <input type="submit" name="update" class="submit" value="Save">
                             </td>
                         </tr>
-                        <tr>
-                            <th colspan="2">Import users</th>
-                        </tr>
-                        <tr>
-                            <td>Group</td>
-                            <td>
-                                <select>
-                                    <option>un
-                                    <option>deux
-                                    <option>trois
-                                    <option>quatre
-                                </select>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>User</td>
-                            <td>
-                                <select>
-                                    <option>un
-                                    <option>deux
-                                    <option>trois
-                                    <option>quatre
-                                </select>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="center" colspan="2">
-                                <input type="submit" name="update" class="submit" value="Import">
-                            </td>
-                        </tr>
+        HTML;
+        if ($groups) {
+            $keys = array_column($groups, 'id');
+            $values = [];
+            foreach ($groups as $group) {
+                $values[$group['id']] = $group['profile']['name'];
+            }
+            $options = array_combine($keys, $values);
+            echo <<<HTML
+                            <tr>
+                                <th colspan="2">Import users</th>
+                            </tr>
+                            <tr>
+                                <td>Group</td>
+                                <td>
+                                    <select name="group" id="group">
+                                        <option value="">-----</option>
+            HTML;
+            echo implode('', array_map(function($key, $value) use ($options) {
+                return "<option value=\"$key\">$options[$key]</option>";
+            }, array_keys($options), array_values($options)));
+            echo <<<HTML
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>User</td>
+                                <td>
+                                    <select name="user" id="user">
+                                        <option value="">-----</option>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="center" colspan="2">
+                                    <input type="submit" name="update" class="submit" value="Import">
+                                </td>
+                            </tr>
+                            <script>
+                                $(document).ready(function() {
+                                    $('#user').select2({width: '100%'});
+                                });
+                                document.getElementById('group').addEventListener('change', function() {
+                                    var group = this.value, user = document.getElementById('user');
+                                    user.innerHTML = '';
+                                    fetch('{$action}?action=getUsers&group=' + group)
+                                        .then(response => response.json())
+                                        .then(data => {
+                                            $("#user").html('');
+                                            $("#user").append('<option value="">-----</option>');
+                                            for (const [key, value] of Object.entries(data)) {
+                                                $("#user").append('<option value="' + key + '">' + value + '</option>');
+                                            }
+                                        });
+                                });
+                            </script>
+            HTML;
+        } else {
+            echo <<<HTML
+                            <tr>
+                                <td colspan="2">
+                                    <div class="error">
+                                        <p>Error connecting to Okta API</p>
+                                    </div>
+                                </td>
+                            </tr>
+            HTML;
+        }
+        echo <<<HTML
                     </tbody>
                 </table>
                 <input type="hidden" name="_glpi_csrf_token" value="$csrf">

@@ -48,6 +48,19 @@ if($plugin->isActivated("okta")) {
         } else {
             Session::addMessageAfterRedirect(__('Settings updated successfully', 'okta'));
         };
+    } else if (isset($_GET["action"]) && $_GET["action"] == "getUsers" && isset($_GET["group"])) {
+        $group = $_GET["group"];
+        $distantUsers = $config::getUsersInGroup($group);
+        if (!$distantUsers) {
+            echo json_encode([]);
+            die();
+        }
+        $users = [];
+        foreach ($distantUsers as $user) {
+            $users[$user['id']] = $user['profile']['firstName'] . ' ' . $user['profile']['lastName'];
+        }
+        echo json_encode($users);
+        die();
     }
 
     Html::header("Okta", $_SERVER["PHP_SELF"], "config", Plugin::class);
