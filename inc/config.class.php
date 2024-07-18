@@ -153,7 +153,7 @@ class PluginOktaConfig extends CommonDBTM {
        $url = $values['url'];
        $key = Toolbox::sodiumDecrypt($values['key']);
 
-       return self::request($url . "/api/v1/users/" . $id . "/users", $key);
+       return self::request($url . "/api/v1/users/" . $id, $key);
    }
 
    static function getUsersInGroup($group) {
@@ -164,49 +164,44 @@ class PluginOktaConfig extends CommonDBTM {
        return self::request($url . "/api/v1/groups/" . $group . "/users", $key);
    }
 
-   static function importUsers() {
+   static function importUser($userId) {
       global $DB;
 
       $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
       $localUsers = iterator_to_array($DB->query("SELECT * FROM glpi_users"));
       $localNames = array_combine(array_column($localUsers, 'id'), array_column($localUsers, 'name'));
       $newUser = new User();
-      $distantUsers = [];
+      $distantUser = self::fetchUserById($userId);
+      if (!$distantUser) return false;
 
-      if (!$distantUsers) return false;
+      $userObject = [];
+      $userName = $distantUser['profile'][$OidcMappings['name']];
+      $ID = array_search($userName, $localNames);
+  
+      foreach ($OidcMappings as $key => $value) {
+          $userObject[$key] = $distantUser['profile'][$value] ?? null;
+      };
+  
+      // get user id from local by name
+  
+      if (!$ID) {
+         $rule = new RuleRightCollection();
+         $input = [
+              'authtype' => Auth::EXTERNAL,
+              'name' => $userObject['name'],
+              '_extauth' => 1,
+              'add' => 1
+           ];
+         $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
+            'type'   => Auth::EXTERNAL,
+            'email'  => $userObject["email"] ?? '',
+            'login'  => $input["name"]
+         ]);
+         $input['_ruleright_process'] = true;
 
-      foreach ($distantUsers as $user) {
-        if ($user['status'] != 'ACTIVE') continue;
-
-        $userObject = [];
-        $userName = $user['profile'][$OidcMappings['name']];
-        $ID = array_search($userName, $localNames);
-
-        foreach ($OidcMappings as $key => $value) {
-            $userObject[$key] = $user['profile'][$value] ?? null;
-        };
-
-        // get user id from local by name
-
-        if (!$ID) {
-           $rule = new RuleRightCollection();
-           $input = [
-                'authtype' => Auth::EXTERNAL,
-                'name' => $userObject['name'],
-                '_extauth' => 1,
-                'add' => 1
-             ];
-           $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
-              'type'   => Auth::EXTERNAL,
-              'email'  => $userObject["email"] ?? '',
-              'login'  => $input["name"]
-           ]);
-           $input['_ruleright_process'] = true;
-
-           $ID = $newUser->add($input);
-        }
-        Oidc::addUserData($user['profile'], $ID);
+         $ID = $newUser->add($input);
       }
+      Oidc::addUserData($distantUser['profile'], $ID);
       return true;
    }
 
@@ -249,6 +244,10 @@ class PluginOktaConfig extends CommonDBTM {
                                 <input type="submit" name="update" class="submit" value="Save">
                             </td>
                         </tr>
+                    </tbody>
+                </table>
+                <input type="hidden" name="_glpi_csrf_token" value="$csrf">
+            </form>
         HTML;
         if ($groups) {
             $keys = array_column($groups, 'id');
@@ -258,6 +257,9 @@ class PluginOktaConfig extends CommonDBTM {
             }
             $options = array_combine($keys, $values);
             echo <<<HTML
+                <form method="post" action="{$action}">
+                    <table class="tab_cadre">
+                        <tbody>
                             <tr>
                                 <th colspan="2">Import users</th>
                             </tr>
@@ -284,45 +286,37 @@ class PluginOktaConfig extends CommonDBTM {
                             </tr>
                             <tr>
                                 <td class="center" colspan="2">
-                                    <input type="submit" name="update" class="submit" value="Import">
+                                    <input type="submit" name="import" class="submit" value="Import">
                                 </td>
                             </tr>
-                            <script>
-                                $(document).ready(function() {
-                                    $('#user').select2({width: '100%'});
-                                });
-                                document.getElementById('group').addEventListener('change', function() {
-                                    var group = this.value, user = document.getElementById('user');
-                                    user.innerHTML = '';
-                                    fetch('{$action}?action=getUsers&group=' + group)
-                                        .then(response => response.json())
-                                        .then(data => {
-                                            $("#user").html('');
-                                            $("#user").append('<option value="">-----</option>');
-                                            for (const [key, value] of Object.entries(data)) {
-                                                $("#user").append('<option value="' + key + '">' + value + '</option>');
-                                            }
-                                        });
-                                });
-                            </script>
+                        </tbody>
+                    </table>
+                    <input type="hidden" name="_glpi_csrf_token" value="$csrf">
+                </form>
+                <script>
+                    $(document).ready(function() {
+                        $('#user').select2({width: '100%'});
+                    });
+                    document.getElementById('group').addEventListener('change', function() {
+                        var group = this.value, user = document.getElementById('user');
+                        user.innerHTML = '';
+                        fetch('{$action}?action=getUsers&group=' + group)
+                            .then(response => response.json())
+                            .then(data => {
+                                $("#user").html('');
+                                $("#user").append('<option value="">-----</option>');
+                                for (const [key, value] of Object.entries(data)) {
+                                    $("#user").append('<option value="' + key + '">' + value + '</option>');
+                                }
+                            });
+                    });
+                </script>
             HTML;
         } else {
             echo <<<HTML
-                            <tr>
-                                <td colspan="2">
-                                    <div class="error">
                                         <p>Error connecting to Okta API</p>
-                                    </div>
-                                </td>
-                            </tr>
             HTML;
         }
-        echo <<<HTML
-                    </tbody>
-                </table>
-                <input type="hidden" name="_glpi_csrf_token" value="$csrf">
-            </form>
-        HTML;
         echo "</div>";
     }
 }
