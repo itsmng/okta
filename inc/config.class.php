@@ -108,7 +108,7 @@ class PluginOktaConfig extends CommonDBTM {
            }
            $query = <<<SQL
               UPDATE $table
-              SET value='{$value}'
+              SET value='{$values[$key]}'
               WHERE name='{$key}'
            SQL;
            $DB->query($query);
