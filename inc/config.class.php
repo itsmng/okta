@@ -104,7 +104,7 @@ class PluginOktaConfig extends CommonDBTM {
        foreach ($fields as $key => $value) {
            if (!isset($values[$key])) continue;
            if ($key == 'key') {
-               $value = Toolbox::sodiumEncrypt($value);
+               $values[$key] = Toolbox::sodiumEncrypt($values[$key]);
            }
            $query = <<<SQL
               UPDATE $table
@@ -225,35 +225,62 @@ class PluginOktaConfig extends CommonDBTM {
 
        $key = Toolbox::sodiumDecrypt($fields['key']);
 
+       echo "<div class='first-bloc'>";
        echo <<<HTML
-        <form class="first-bloc" method="post" action="{$action}">
-            <table class="tab_cadre">
-                <tbody>
-                    <tr>
-                        <th colspan="2">Okta API Configuration</th>
-                    </tr>
-                    <tr>
-                        <td>API endpoint</td>
-                        <td><input type="text" name="url" value="{$fields['url']}"></td>
-                    </tr>
-                    <tr>
-                        <td>API key</td>
-                        <td><input type="text" name="key" value="{$key}"></td>
-                    </tr>
-                    <tr>
-                        <td>Group name</td>
-                        <td><input type="text" name="group" value="{$fields['group']}"></td>
-                    </tr>
-                    <tr>
-                        <td class="center" colspan="2">
-                            <input type="submit" name="update" class="submit" value="Save">
-                            <input type="submit" name="import" class="submit" value="Import">
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <input type="hidden" name="_glpi_csrf_token" value="$csrf">
-        </form>
-       HTML; 
+            <form method="post" action="{$action}">
+                <table class="tab_cadre">
+                    <tbody>
+                        <tr>
+                            <th colspan="2">Okta API Configuration</th>
+                        </tr>
+                        <tr>
+                            <td>API endpoint</td>
+                            <td><input type="text" name="url" value="{$fields['url']}"></td>
+                        </tr>
+                        <tr>
+                            <td>API key</td>
+                            <td><input type="text" name="key" value="{$key}"></td>
+                        </tr>
+                        <tr>
+                            <td class="center" colspan="2">
+                                <input type="submit" name="update" class="submit" value="Save">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th colspan="2">Import users</th>
+                        </tr>
+                        <tr>
+                            <td>Group</td>
+                            <td>
+                                <select>
+                                    <option>un
+                                    <option>deux
+                                    <option>trois
+                                    <option>quatre
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>User</td>
+                            <td>
+                                <select>
+                                    <option>un
+                                    <option>deux
+                                    <option>trois
+                                    <option>quatre
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="center" colspan="2">
+                                <input type="submit" name="update" class="submit" value="Import">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <input type="hidden" name="_glpi_csrf_token" value="$csrf">
+            </form>
+        HTML;
+        echo "</div>";
     }
 }
