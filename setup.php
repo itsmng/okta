@@ -30,7 +30,7 @@
  * ---------------------------------------------------------------------
  */
 
-define('PLUGIN_OKTA_VERSION', '1.0.0');
+define('PLUGIN_OKTA_VERSION', '1.1.0');
 
 if (!defined("PLUGIN_OKTA_DIR")) {
    define("PLUGIN_OKTA_DIR", Plugin::getPhpDir("okta"));
@@ -55,7 +55,7 @@ function plugin_init_okta() {
 function plugin_version_okta() {
     return array(
         'name'           => "Okta",
-        'version'        => '3.0.0',
+        'version'        => PLUGIN_OKTA_VERSION,
         'author'         => 'ITSM Dev Team',
         'license'        => 'GPLv3+',
         'homepage'       => 'https://github.com/itsmng/okta',
