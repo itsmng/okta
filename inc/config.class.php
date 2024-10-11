@@ -185,11 +185,15 @@ class PluginOktaConfig extends CommonDBTM {
        global $DB;
 
        $apiMappings = [
-           'nickname' => 'login',
+           'sub' => 'id',
+           'name' => 'displayName',
+           'profile' => 'profileUrl',
+           'nickname' => 'nickName',
            'family_name' => 'lastName',
            'given_name' => 'firstName',
            'email' => 'email',
            'phone_number' => 'mobilePhone',
+           'preferred_username' => 'login',
        ];
 
        $newUser = new User();
@@ -206,9 +210,10 @@ class PluginOktaConfig extends CommonDBTM {
                $userObject[$key] = $distantUser['profile'][$value];
            }
        };
-       $userName = $distantUser['profile']['login'];
+       $profile = $distantUser['profile'];
+       $profile += ['id' => $distantUser['id']];
+       $userName = $profile[$OidcMappings['name']];
        $ID = array_search($userName, $localNames);
-
        
        if (!$ID) {
            $rule = new RuleRightCollection();
