@@ -212,7 +212,11 @@ class PluginOktaConfig extends CommonDBTM {
        };
        $profile = $distantUser['profile'];
        $profile += ['id' => $distantUser['id']];
-       $userName = $profile[$OidcMappings['name']];
+       if (!isset($OidcMappings['name']) || !isset($apiMappings[$OidcMappings['name']])) {
+           Session::addMessageAfterRedirect(__('No okta mapping found for : ', 'okta') . $OidcMappings['name'], false, ERROR);
+           return false;
+       }
+       $userName = $profile[$apiMappings[$OidcMappings['name']]];
        $ID = array_search($userName, $localNames);
        
        if (!$ID) {
@@ -244,13 +248,11 @@ class PluginOktaConfig extends CommonDBTM {
           $userList = self::getUsersInGroup($groupId);
           foreach ($userList as $user) {
               if (!self::createOrUpdateUser($user['id'])) {
-                  Session::addMessageAfterRedirect(__('Error importing user'), false, ERROR);
                   return false;
               }
           }
       } else {
           if (!self::createOrUpdateUser($userId)) {
-              Session::addMessageAfterRedirect(__('Error importing user'), false, ERROR);
               return false;
           }
       }
