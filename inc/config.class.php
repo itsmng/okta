@@ -181,6 +181,19 @@ class PluginOktaConfig extends CommonDBTM {
        return self::request($url . "/api/v1/groups/" . $group . "/users", $key);
    }
 
+   static function getGroupsForUser($userId) {
+       $values = self::getConfigValues();
+       $url = $values['url'];
+       $key = Toolbox::sodiumDecrypt($values['key']);
+
+       $groups = self::request($url . "/api/v1/users/" . $userId . "/groups", $key);
+       $names= [];
+       foreach($groups as $group) {
+            $names[] = $group['profile']['name'];
+       }
+       return $names;
+   }
+
    private static function createOrUpdateUser($userId) {
        global $DB;
 
@@ -236,14 +249,12 @@ class PluginOktaConfig extends CommonDBTM {
 
            $ID = $newUser->add($input);
        }
+       $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
        Oidc::addUserData($userObject, $ID);
        return true;
    }
 
    static function importUser($userId, $groupId = null) {
-       global $DB;
-
-
       if ($userId <= 0) {
           $userList = self::getUsersInGroup($groupId);
           foreach ($userList as $user) {
