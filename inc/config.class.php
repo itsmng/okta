@@ -217,8 +217,8 @@ class PluginOktaConfig extends CommonDBTM {
        $OidcTranslation = [
            'id' => 'id',
            'name' => 'name',
-           'given_name' => 'firstName',
-           'family_name' => 'lastName',
+           'given_name' => 'firstname',
+           'family_name' => 'realname',
            'phone_number' => 'phone',
            'email' => 'email'
        ];
@@ -243,7 +243,7 @@ class PluginOktaConfig extends CommonDBTM {
        $profile = $distantUser['profile'];
        $profile += ['id' => $distantUser['id']];
 
-       $query = "SELECT * FROM glpi_users
+       $query = "SELECT glpi_users.id FROM glpi_users
        LEFT JOIN glpi_useremails ON glpi_users.id = glpi_useremails.users_id
        WHERE " . $OidcTranslation[$config['duplicate']] . " = '" . $profile[$apiMappings[$config['duplicate']]] . "'";
        $localUser = iterator_to_array($DB->query($query));
