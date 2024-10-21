@@ -51,11 +51,17 @@ class PluginOktaConfig extends CommonDBTM {
               INSERT INTO `$table` (name, value)
               VALUES ('url', ''),
                      ('key', ''),
-                     ('group', '')
+                     ('duplicate', 'id')
             SQL;
 
             $DB->queryOrDie($addquery, $DB->error());
-      }
+        } else if (PLUGIN_OKTA_VERSION == "1.2.2") {
+            $query = <<<SQL
+              INSERT INTO `$table` (name, value)
+              VALUES ('duplicate', 'id')
+            SQL;
+            $DB->queryOrDie($query, $DB->error());
+        }
 
       return true;
    }
@@ -208,14 +214,25 @@ class PluginOktaConfig extends CommonDBTM {
            'phone_number' => 'mobilePhone',
            'preferred_username' => 'login',
        ];
+       $OidcTranslation = [
+           'id' => 'id',
+           'name' => 'name',
+           'given_name' => 'firstName',
+           'family_name' => 'lastName',
+           'phone_number' => 'phone',
+           'email' => 'email'
+       ];
+
+       $config = self::getConfigValues();
+       if ($config['duplicate'] != 'email') {
+           $duplicateIndex = $OidcTranslation[$config['duplicate']];
+       }
 
        $newUser = new User();
        $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
-       if (!isset($OidcMappings['name'])) return false;
-       $distantUser = self::fetchUserById($userId);
-       $localUsers = iterator_to_array($DB->query("SELECT * FROM glpi_users"));
-       $localNames = array_combine(array_column($localUsers, 'id'), array_column($localUsers, 'name'));
+       if (!isset($OidcMappings[$OidcMappings[$config['duplicate']]])) return false;
 
+       $distantUser = self::fetchUserById($userId);
        if (!$distantUser) return false;
        $userObject = [];
        foreach ($apiMappings as $key => $value) {
@@ -225,25 +242,26 @@ class PluginOktaConfig extends CommonDBTM {
        };
        $profile = $distantUser['profile'];
        $profile += ['id' => $distantUser['id']];
-       if (!isset($OidcMappings['name']) || !isset($apiMappings[$OidcMappings['name']])) {
-           Session::addMessageAfterRedirect(__('No okta mapping found for : ', 'okta') . $OidcMappings['name'], false, ERROR);
-           return false;
-       }
-       $userName = $profile[$apiMappings[$OidcMappings['name']]];
-       $ID = array_search($userName, $localNames);
-       
+
+       $query = "SELECT * FROM glpi_users
+       LEFT JOIN glpi_useremails ON glpi_users.id = glpi_useremails.users_id
+       WHERE " . $OidcTranslation[$config['duplicate']] . " = '" . $profile[$apiMappings[$config['duplicate']]] . "'";
+       $localUser = iterator_to_array($DB->query($query));
+       $localUser = empty($localUser) ? false : $localUser[0];
+
+       $ID = empty($localUser) ? false : $localUser['id'];
        if (!$ID) {
            $rule = new RuleRightCollection();
            $input = [
                'authtype' => Auth::EXTERNAL,
-               'name' => $userName,
+               'name' => $profile[$apiMappings[$OidcMappings['name']]],
                '_extauth' => 1,
                'add' => 1
            ];
            $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
                'type'   => Auth::EXTERNAL,
-               'email'  => $userObject["email"] ?? '',
-               'login'  => $userName,
+               'email'  => $profile["email"] ?? '',
+               'login'  => $profile[$apiMappings[$OidcMappings['name']]],
            ]);
            $input['_ruleright_process'] = true;
 
@@ -276,6 +294,7 @@ class PluginOktaConfig extends CommonDBTM {
      * @return void
      */
     public function showConfigForm() {
+        global $DB;
        if (!Session::haveRight("plugin_okta_config",UPDATE)) {
             return false;
        }
@@ -303,6 +322,20 @@ class PluginOktaConfig extends CommonDBTM {
                         <tr>
                             <td>API key</td>
                             <td><input type="text" name="key" value="{$key}"></td>
+                        </tr>
+                        <tr>
+                            <td>Duplicate key</td>
+                            <td>
+                                <select name="duplicate">
+HTML;
+                    $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
+                    foreach ($OidcMappings as $key => $value) {
+                        if (in_array($key, ['picture', 'locale', 'group'])) continue;
+                        echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key</option>";
+                    }
+                echo <<<HTML
+                                </select>
+                            </td>
                         </tr>
                         <tr>
                             <td class="center" colspan="2">
