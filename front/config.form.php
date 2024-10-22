@@ -36,7 +36,7 @@ $plugin = new Plugin();
 
 if($plugin->isActivated("okta")) {
     $config = new PluginOktaConfig();
-    if(isset($_POST["update"]) || isset($_POST["import"])) {
+    if(isset($_POST["update"]) || isset($_POST["import"]) || isset($_POST["import_regex"])) {
         Session::checkRight("plugin_okta_config", UPDATE);
         $config::updateConfigValues($_POST);
         if (isset($_POST["import"])) {
@@ -44,6 +44,15 @@ if($plugin->isActivated("okta")) {
                 Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
             } else {
                 Session::addMessageAfterRedirect(__('Users imported successfully', 'okta'));
+            }
+        } else if (isset($_POST["import_regex"])) {
+            $groups = $config::getGroupsByRegex($_POST["regex"]);
+            foreach ($groups as $id => $group) {
+                if (!$config::importUser(-1, $id)) {
+                    Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
+                } else {
+                    Session::addMessageAfterRedirect(sprintf(__('Users from %s imported successfully', 'okta'), $group));
+                }
             }
         } else {
             Session::addMessageAfterRedirect(__('Settings updated successfully', 'okta'));

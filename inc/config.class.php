@@ -163,12 +163,31 @@ class PluginOktaConfig extends CommonDBTM {
        return $jsonResponse;
    }
 
-   static function testConnection() {
+   static function getGroups() {
        $values = self::getConfigValues();
        $url = $values['url'];
        $key = Toolbox::sodiumDecrypt($values['key']);
 
-       return self::request($url . "/api/v1/groups", $key);
+       $groupsObjects = self::request($url . "/api/v1/groups", $key);
+       $groups = [];
+       foreach ($groupsObjects as $group) {
+           $groups[$group['id']] = $group['profile']['name'];
+       }
+       return $groups;
+   }
+
+   static function getGroupsByRegex($regex) {
+       $groups = self::getGroups();
+       $regex = stripslashes($regex);
+
+       $filteredGroups = [];
+
+       foreach ($groups as $key => $value) {
+           if (preg_match("/$regex/i", $value)) {
+               $filteredGroups[$key] = $value;
+           }
+       }
+       return $filteredGroups;
    }
 
    static function fetchUserById($id) {
@@ -224,9 +243,6 @@ class PluginOktaConfig extends CommonDBTM {
        ];
 
        $config = self::getConfigValues();
-       if ($config['duplicate'] != 'email') {
-           $duplicateIndex = $OidcTranslation[$config['duplicate']];
-       }
 
        $newUser = new User();
        $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
@@ -303,7 +319,7 @@ class PluginOktaConfig extends CommonDBTM {
        $action = self::getFormURL();
        $csrf = Session::getNewCSRFToken();
 
-       $groups = self::testConnection();
+       $groups = self::getGroups();
 
        $key = Toolbox::sodiumDecrypt($fields['key']);
 
@@ -348,12 +364,6 @@ HTML;
             </form>
        HTML;
        if ($groups) {
-           $keys = array_column($groups, 'id');
-           $values = [];
-           foreach ($groups as $group) {
-               $values[$group['id']] = $group['profile']['name'];
-            }
-            $options = array_combine($keys, $values);
             echo <<<HTML
                 <form method="post" action="{$action}">
                     <table class="tab_cadre">
@@ -367,9 +377,9 @@ HTML;
                                     <select name="group" id="group">
                                         <option value="">-----</option>
 HTML;
-            echo implode('', array_map(function($key, $value) use ($options) {
-                return "<option value=\"$key\">$options[$key]</option>";
-            }, array_keys($options), array_values($options)));
+            echo implode('', array_map(function($key, $value) use ($groups) {
+                return "<option value=\"$key\">$groups[$key]</option>";
+            }, array_keys($groups), array_values($groups)));
             echo <<<HTML
                                     </select>
                                 </td>
@@ -385,6 +395,27 @@ HTML;
                             <tr>
                                 <td class="center" colspan="2">
                                     <input type="submit" name="import" class="submit" value="Import">
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <input type="hidden" name="_glpi_csrf_token" value="$csrf">
+                </form>
+                <form method="post" action="{$action}">
+                    <table class="tab_cadre">
+                        <tbody>
+                            <tr>
+                                <th colspan="2">Regex import groups</th>
+                            </tr>
+                            <tr>
+                                <td>Group regex</td>
+                                <td>
+                                    <input type="text" name="regex">
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="center" colspan="2">
+                                    <input type="submit" name="import_regex" class="submit" value="Import">
                                 </td>
                             </tr>
                         </tbody>
