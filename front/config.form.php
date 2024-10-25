@@ -40,7 +40,7 @@ if($plugin->isActivated("okta")) {
         Session::checkRight("plugin_okta_config", UPDATE);
         $config::updateConfigValues($_POST);
         if (isset($_POST["import"])) {
-            $group_regex = isset($_POST['use_group_regex']) ? $_POST['group_regex'] : '^' . $_POST['group'] . '$';
+            $group_regex = isset($_POST['use_group_regex']) ? $_POST['group_regex'] : '^' . stripslashes($_POST['group']) . '$';
             if (empty($group_regex)) {
                 Session::addMessageAfterRedirect(__('Please provide a group regex', 'okta'), false, ERROR);
                 Html::back();

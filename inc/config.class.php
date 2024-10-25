@@ -194,8 +194,9 @@ SQL;
 
         foreach ($groups as $key => $value) {
             try {
-                if (preg_match("/$regex/i", $value)) {
-                    $filteredGroups[$key] = $value;
+                $groupName = stripslashes($value);
+                if (preg_match("/$regex/i", $groupName)) {
+                    $filteredGroups[$key] = $groupName;
                 }
             } catch (Exception $e) {
                 return false;
@@ -396,7 +397,7 @@ SQL;
                                         <option value="">-----</option>
 <?php
             foreach($groups as $key => $group) {
-                echo "<option value='".addslashes($group)."' data-gid='".$key."'>".$group."</option>";
+                echo "<option value='".htmlspecialchars(stripslashes($group))."' data-gid='".$key."'>".stripslashes($group)."</option>";
             }
 ?>
                                     </select>
