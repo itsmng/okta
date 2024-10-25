@@ -395,9 +395,9 @@ SQL;
                                     <select name="group" id="group" <?php echo $fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
                                         <option value="">-----</option>
 <?php
-            echo implode('', array_map(function($key, $value) use ($groups) {
-                return "<option value=\"$key\">$groups[$key]</option>";
-            }, array_keys($groups), array_values($groups)));
+            foreach($groups as $key => $group) {
+                echo "<option value='".addslashes($group)."' data-gid='".$key."'>".$group."</option>";
+            }
 ?>
                                     </select>
                                 </td>
@@ -430,7 +430,8 @@ SQL;
                 $('#user').select2({width: '100%'});
             })
             document.getElementById('group').addEventListener('change', function() {
-                var group = this.value, user = document.getElementById('user');
+                var group = this.querySelector('option:checked').getAttribute('data-gid');
+                var user = document.getElementById('user');
                 user.innerHTML = '';
                 // add loading animation
                 user.innerHTML = '<option value="">Please wait...</option>';

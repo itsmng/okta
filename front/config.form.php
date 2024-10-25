@@ -45,7 +45,7 @@ if($plugin->isActivated("okta")) {
                 Session::addMessageAfterRedirect(__('Please provide a group regex', 'okta'), false, ERROR);
                 Html::back();
             }
-            $groups = $config::getGroupsByRegex($_POST["group_regex"]);
+            $groups = $config::getGroupsByRegex($group_regex);
             if (!$groups) {
                 Session::addMessageAfterRedirect(sprintf(__('Invalid regex: %s', 'okta'), $_POST["group_regex"]), false, ERROR);
                 Html::back();
