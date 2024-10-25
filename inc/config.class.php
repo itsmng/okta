@@ -43,7 +43,7 @@ class PluginOktaConfig extends CommonDBTM {
                   `value` TEXT collate utf8_unicode_ci default NULL,
                   PRIMARY KEY (`id`)
               ) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
-            SQL;
+SQL;
 
             $DB->queryOrDie($query, $DB->error());
 
@@ -52,257 +52,255 @@ class PluginOktaConfig extends CommonDBTM {
               VALUES ('url', ''),
                      ('key', ''),
                      ('duplicate', 'id')
-            SQL;
+SQL;
 
             $DB->queryOrDie($addquery, $DB->error());
         } else if (PLUGIN_OKTA_VERSION == "1.2.2") {
             $query = <<<SQL
               INSERT INTO `$table` (name, value)
               VALUES ('duplicate', 'id')
-            SQL;
+SQL;
+            $DB->queryOrDie($query, $DB->error());
+        } else if (PLUGIN_OKTA_VERSION == "1.3.3") {
+            $query = <<<SQL
+              INSERT INTO `$table` (name, value)
+              VALUES ('use_user_regex', '0'),
+                  ('user_regex', ''),
+                  ('use_group_regex', '0'),
+                  ('group_regex', '')
+SQL;
             $DB->queryOrDie($query, $DB->error());
         }
 
-      return true;
-   }
+        return true;
+    }
 
-   static function uninstall() {
-       global $DB;
+    static function uninstall() {
+        global $DB;
 
-       $table = self::getTable();
+        $table = self::getTable();
 
-       if ($DB->tableExists($table)) {
-           $query = <<<SQL
+        if ($DB->tableExists($table)) {
+            $query = <<<SQL
               DROP TABLE `$table`
-           SQL;
+SQL;
 
-           $DB->queryOrDie($query, $DB->error());
-      }
+            $DB->queryOrDie($query, $DB->error());
+        }
 
-      return true;
-   }
+        return true;
+    }
 
-   static private function getConfigValues() {
-       global $DB;
+    static private function getConfigValues() {
+        global $DB;
 
-       $table = self::getTable();
+        $table = self::getTable();
 
-       $query = <<<SQL
+        $query = <<<SQL
           SELECT name, value from $table
-       SQL;
+SQL;
 
-       $results = iterator_to_array($DB->query($query));
+        $results = iterator_to_array($DB->query($query));
 
-       foreach($results as $id => $result) {
-           $results[$result['name']] = $result['value'];
-           unset($results[$id]);
-       }
-       return $results;
-   }
+        foreach($results as $id => $result) {
+            $results[$result['name']] = $result['value'];
+            unset($results[$id]);
+        }
+        return $results;
+    }
 
-   static function updateConfigValues($values) {
-       global $DB;
+    static function updateConfigValues($values) {
+        global $DB;
 
-       $table = self::getTable();
-       $fields = self::getConfigValues();
+        $table = self::getTable();
+        $fields = self::getConfigValues();
 
 
-       foreach ($fields as $key => $value) {
-           if (!isset($values[$key])) continue;
-           if ($key == 'key') {
-               $values[$key] = Toolbox::sodiumEncrypt($values[$key]);
-           }
-           $query = <<<SQL
+        foreach ($fields as $key => $value) {
+            if (!isset($values[$key])) continue;
+            if ($key == 'key') {
+                $values[$key] = Toolbox::sodiumEncrypt($values[$key]);
+            }
+            $query = <<<SQL
               UPDATE $table
               SET value='{$values[$key]}'
               WHERE name='{$key}'
-           SQL;
-           $DB->query($query);
-       }
-       return true;
-   }
+SQL;
+            $DB->query($query);
+        }
+        return true;
+    }
 
-   static private function request($url, $key, $method = 'GET', $body = null) {
-       $ch = curl_init();
+    static private function request($uri, $method = 'GET', $body = null) {
+        $ch = curl_init();
+        $values = self::getConfigValues();
+        $url = $values['url'];
+        $key = Toolbox::sodiumDecrypt($values['key']);
 
-       curl_setopt($ch, CURLOPT_URL, $url);
-       curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-       curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 
-       $headers = [
-           'Accept: application/json',
-           'Content-Type: application/json',
-           'Authorization: SSWS ' . $key,
-       ];
-       curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($ch, CURLOPT_URL, $url . '/' . $uri);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
 
-       if ($body) {
-           curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
-       }
+        $headers = [
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'Authorization: SSWS ' . $key,
+        ];
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
-       $response = curl_exec($ch);
+        if ($body) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        }
 
-       if (curl_errno($ch)) {
-           Session::addMessageAfterRedirect(__('Error connecting to Okta API: ' . curl_error($ch)), 'error');
-           curl_close($ch);
-           return false;
-       }
+        $response = curl_exec($ch);
 
-       curl_close($ch);
+        if (curl_errno($ch)) {
+            Session::addMessageAfterRedirect(__('Error connecting to Okta API: ' . curl_error($ch)), 'error');
+            curl_close($ch);
+            return false;
+        }
 
-       $jsonResponse = json_decode($response, true);
+        curl_close($ch);
 
-       if (!$response || count($jsonResponse) == 0) {
-           Session::addMessageAfterRedirect(__('Error connecting to Okta API'), 'error');
-           return false;
-       } else if (isset($jsonResponse['errorCode'])) {
-           Session::addMessageAfterRedirect(__('Invalid API key'), 'error');
-           return false;
-       }
+        $jsonResponse = json_decode($response, true);
 
-       return $jsonResponse;
-   }
+        if (!$response || count($jsonResponse) == 0) {
+            Session::addMessageAfterRedirect(__('Error connecting to Okta API'), 'error');
+            return false;
+        } else if (isset($jsonResponse['errorCode'])) {
+            Session::addMessageAfterRedirect(__('Invalid API key'), 'error');
+            return false;
+        }
 
-   static function getGroups() {
-       $values = self::getConfigValues();
-       $url = $values['url'];
-       $key = Toolbox::sodiumDecrypt($values['key']);
+        return $jsonResponse;
+    }
 
-       $groupsObjects = self::request($url . "/api/v1/groups", $key);
-       $groups = [];
-       foreach ($groupsObjects as $group) {
-           $groups[$group['id']] = $group['profile']['name'];
-       }
-       return $groups;
-   }
+    static function getGroups() {
+        $groupsObjects = self::request("/api/v1/groups");
+        $groups = [];
+        foreach ($groupsObjects as $group) {
+            $groups[$group['id']] = $group['profile']['name'];
+        }
+        return $groups;
+    }
 
-   static function getGroupsByRegex($regex) {
-       $groups = self::getGroups();
-       $regex = stripslashes($regex);
+    static function getGroupsByRegex($regex) {
+        $groups = self::getGroups();
+        $regex = stripslashes($regex);
 
-       $filteredGroups = [];
+        $filteredGroups = [];
 
-       foreach ($groups as $key => $value) {
-           if (preg_match("/$regex/i", $value)) {
-               $filteredGroups[$key] = $value;
-           }
-       }
-       return $filteredGroups;
-   }
+        foreach ($groups as $key => $value) {
+            if (preg_match("/$regex/i", $value)) {
+                $filteredGroups[$key] = $value;
+            }
+        }
+        die(json_encode($filteredGroups));
+        return $filteredGroups;
+    }
 
-   static function fetchUserById($id) {
-       $values = self::getConfigValues();
-       $url = $values['url'];
-       $key = Toolbox::sodiumDecrypt($values['key']);
+    static function fetchUserById($id) {
+        return self::request("/api/v1/users/" . $id);
+    }
 
-       return self::request($url . "/api/v1/users/" . $id, $key);
-   }
+    static function getUsersInGroup($group) {
+        return self::request("/api/v1/groups/" . $group . "/users");
+    }
 
-   static function getUsersInGroup($group) {
-       $values = self::getConfigValues();
-       $url = $values['url'];
-       $key = Toolbox::sodiumDecrypt($values['key']);
-
-       return self::request($url . "/api/v1/groups/" . $group . "/users", $key);
-   }
-
-   static function getGroupsForUser($userId) {
-       $values = self::getConfigValues();
-       $url = $values['url'];
-       $key = Toolbox::sodiumDecrypt($values['key']);
-
-       $groups = self::request($url . "/api/v1/users/" . $userId . "/groups", $key);
-       $names= [];
-       foreach($groups as $group) {
+    static function getGroupsForUser($userId) {
+        $groups = self::request("/api/v1/users/" . $userId . "/groups");
+        $names= [];
+        foreach($groups as $group) {
             $names[] = $group['profile']['name'];
-       }
-       return $names;
-   }
+        }
+        return $names;
+    }
 
-   private static function createOrUpdateUser($userId) {
-       global $DB;
+    private static function createOrUpdateUser($userId) {
+        global $DB;
 
-       $apiMappings = [
-           'sub' => 'id',
-           'name' => 'displayName',
-           'profile' => 'profileUrl',
-           'nickname' => 'nickName',
-           'family_name' => 'lastName',
-           'given_name' => 'firstName',
-           'email' => 'email',
-           'phone_number' => 'mobilePhone',
-           'preferred_username' => 'login',
-       ];
-       $OidcTranslation = [
-           'id' => 'id',
-           'name' => 'name',
-           'given_name' => 'firstname',
-           'family_name' => 'realname',
-           'phone_number' => 'phone',
-           'email' => 'email'
-       ];
+        $apiMappings = [
+            'sub' => 'id',
+            'name' => 'displayName',
+            'profile' => 'profileUrl',
+            'nickname' => 'nickName',
+            'family_name' => 'lastName',
+            'given_name' => 'firstName',
+            'email' => 'email',
+            'phone_number' => 'mobilePhone',
+            'preferred_username' => 'login',
+        ];
+        $OidcTranslation = [
+            'id' => 'id',
+            'name' => 'name',
+            'given_name' => 'firstname',
+            'family_name' => 'realname',
+            'phone_number' => 'phone',
+            'email' => 'email'
+        ];
 
-       $config = self::getConfigValues();
+        $config = self::getConfigValues();
 
-       $newUser = new User();
-       $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
-       if (!isset($OidcMappings[$OidcMappings[$config['duplicate']]])) return false;
+        $newUser = new User();
+        $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
+        if (!isset($OidcMappings[$OidcMappings[$config['duplicate']]])) return false;
 
-       $distantUser = self::fetchUserById($userId);
-       if (!$distantUser) return false;
-       $userObject = [];
-       foreach ($apiMappings as $key => $value) {
-           if (isset($distantUser['profile'][$value])) {
-               $userObject[$key] = $distantUser['profile'][$value];
-           }
-       };
-       $profile = $distantUser['profile'];
-       $profile += ['id' => $distantUser['id']];
+        $distantUser = self::fetchUserById($userId);
+        if (!$distantUser) return false;
+        $userObject = [];
+        foreach ($apiMappings as $key => $value) {
+            if (isset($distantUser['profile'][$value])) {
+                $userObject[$key] = $distantUser['profile'][$value];
+            }
+        };
+        $profile = $distantUser['profile'];
+        $profile += ['id' => $distantUser['id']];
 
-       $query = "SELECT glpi_users.id FROM glpi_users
-       LEFT JOIN glpi_useremails ON glpi_users.id = glpi_useremails.users_id
-       WHERE " . $OidcTranslation[$config['duplicate']] . " = '" . $profile[$apiMappings[$config['duplicate']]] . "'";
-       $localUser = iterator_to_array($DB->query($query));
-       $localUser = empty($localUser) ? false : $localUser[0];
+        $query = "SELECT glpi_users.id FROM glpi_users
+            LEFT JOIN glpi_useremails ON glpi_users.id = glpi_useremails.users_id
+            WHERE " . $OidcTranslation[$config['duplicate']] . " = '" . $profile[$apiMappings[$config['duplicate']]] . "'";
+        $localUser = iterator_to_array($DB->query($query));
+        $localUser = empty($localUser) ? false : $localUser[0];
 
-       $ID = empty($localUser) ? false : $localUser['id'];
-       if (!$ID) {
-           $rule = new RuleRightCollection();
-           $input = [
-               'authtype' => Auth::EXTERNAL,
-               'name' => $profile[$apiMappings[$OidcMappings['name']]],
-               '_extauth' => 1,
-               'add' => 1
-           ];
-           $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
-               'type'   => Auth::EXTERNAL,
-               'email'  => $profile["email"] ?? '',
-               'login'  => $profile[$apiMappings[$OidcMappings['name']]],
-           ]);
-           $input['_ruleright_process'] = true;
+        $ID = empty($localUser) ? false : $localUser['id'];
+        if (!$ID) {
+            $rule = new RuleRightCollection();
+            $input = [
+                'authtype' => Auth::EXTERNAL,
+                'name' => $profile[$apiMappings[$OidcMappings['name']]],
+                '_extauth' => 1,
+                'add' => 1
+            ];
+            $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
+                'type'   => Auth::EXTERNAL,
+                'email'  => $profile["email"] ?? '',
+                'login'  => $profile[$apiMappings[$OidcMappings['name']]],
+            ]);
+            $input['_ruleright_process'] = true;
 
-           $ID = $newUser->add($input);
-       }
-       $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
-       Oidc::addUserData($userObject, $ID);
-       return true;
-   }
+            $ID = $newUser->add($input);
+        }
+        $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
+        Oidc::addUserData($userObject, $ID);
+        return true;
+    }
 
-   static function importUser($userId, $groupId = null) {
-      if ($userId <= 0) {
-          $userList = self::getUsersInGroup($groupId);
-          foreach ($userList as $user) {
-              if (!self::createOrUpdateUser($user['id'])) {
-                  return false;
-              }
-          }
-      } else {
-          if (!self::createOrUpdateUser($userId)) {
-              return false;
-          }
-      }
-      return true;
-   }
+    static function importUser($userId, $groupId = null) {
+        if ($userId <= 0) {
+            $userList = self::getUsersInGroup($groupId);
+            foreach ($userList as $user) {
+                if (!self::createOrUpdateUser($user['id'])) {
+                    return false;
+                }
+            }
+        } else {
+            if (!self::createOrUpdateUser($userId)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
     /**
      * Displays the configuration page for the plugin
@@ -311,20 +309,20 @@ class PluginOktaConfig extends CommonDBTM {
      */
     public function showConfigForm() {
         global $DB;
-       if (!Session::haveRight("plugin_okta_config",UPDATE)) {
+        if (!Session::haveRight("plugin_okta_config",UPDATE)) {
             return false;
-       }
+        }
 
-       $fields = self::getConfigValues();
-       $action = self::getFormURL();
-       $csrf = Session::getNewCSRFToken();
+        $fields = self::getConfigValues();
+        $action = self::getFormURL();
+        $csrf = Session::getNewCSRFToken();
 
-       $groups = self::getGroups();
+        $groups = self::getGroups();
 
-       $key = Toolbox::sodiumDecrypt($fields['key']);
+        $key = Toolbox::sodiumDecrypt($fields['key']);
 
-       echo "<div class='first-bloc'>";
-       echo <<<HTML
+?>
+<div class='first-bloc'>";
             <form method="post" action="{$action}">
                 <table class="tab_cadre">
                     <tbody>
@@ -343,13 +341,13 @@ class PluginOktaConfig extends CommonDBTM {
                             <td>Duplicate key</td>
                             <td>
                                 <select name="duplicate">
-HTML;
-                    $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
-                    foreach ($OidcMappings as $key => $value) {
-                        if (in_array($key, ['picture', 'locale', 'group'])) continue;
-                        echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key</option>";
-                    }
-                echo <<<HTML
+<?php
+        $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
+        foreach ($OidcMappings as $key => $value) {
+            if (in_array($key, ['picture', 'locale', 'group'])) continue;
+            echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key</option>";
+        }
+?>
                                 </select>
                             </td>
                         </tr>
@@ -362,92 +360,87 @@ HTML;
                 </table>
                 <input type="hidden" name="_glpi_csrf_token" value="$csrf">
             </form>
-       HTML;
-       if ($groups) {
-            echo <<<HTML
+<?php if ($groups) { ?>
                 <form method="post" action="{$action}">
                     <table class="tab_cadre">
                         <tbody>
                             <tr>
-                                <th colspan="2">Import users</th>
+                                <th colspan="4">Import users</th>
                             </tr>
                             <tr>
+                                <td>Use Regex</td>
+                                <td>
+                                    <input type="checkbox" name="use_group_regex" id="regex_group_checkbox" <?php echo $fields['use_group_regex'] ? 'checked' : '' ?>>
+                                </td>
                                 <td>Group</td>
                                 <td>
-                                    <select name="group" id="group">
+                                    <input type="text" name="group_regex" id="group_regex" <?php echo !$fields['use_group_regex'] ? 'style="display: none"' : '' ?>>
+                                    <select name="group" id="group" <?php echo $fields['use_group_regex'] ? 'style="display: none"' : '' ?>>
                                         <option value="">-----</option>
-HTML;
+<?php
             echo implode('', array_map(function($key, $value) use ($groups) {
                 return "<option value=\"$key\">$groups[$key]</option>";
             }, array_keys($groups), array_values($groups)));
-            echo <<<HTML
+?>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
                                 <td>User</td>
-                                <td>
+                                <td colspan='3'>
                                     <select name="user" id="user">
                                         <option value="-1">-----</option>
                                     </select>
                                 </td>
                             </tr>
                             <tr>
+                                <td></td>
                                 <td class="center" colspan="2">
                                     <input type="submit" name="import" class="submit" value="Import">
                                 </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <input type="hidden" name="_glpi_csrf_token" value="$csrf">
-                </form>
-                <form method="post" action="{$action}">
-                    <table class="tab_cadre">
-                        <tbody>
-                            <tr>
-                                <th colspan="2">Regex import groups</th>
-                            </tr>
-                            <tr>
-                                <td>Group regex</td>
-                                <td>
-                                    <input type="text" name="regex">
-                                </td>
-                            </tr>
-                            <tr>
                                 <td class="center" colspan="2">
-                                    <input type="submit" name="import_regex" class="submit" value="Import">
+                                    <input type="submit" name="full_import" class="submit" value="Full import">
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                     <input type="hidden" name="_glpi_csrf_token" value="$csrf">
                 </form>
-                <script>
-                    $(document).ready(function() {
-                        $('#user').select2({width: '100%'});
-                    });
-                    document.getElementById('group').addEventListener('change', function() {
-                        var group = this.value, user = document.getElementById('user');
-                        user.innerHTML = '';
-                        // add loading animation
-                        user.innerHTML = '<option value="">Please wait...</option>';
-                        fetch('{$action}?action=getUsers&group=' + group)
-                            .then(response => response.json())
-                            .then(data => {
-                                $("#user").html('');
-                                $("#user").append('<option value="-1">-----</option>');
-                                for (const [key, value] of Object.entries(data)) {
-                                    $("#user").append('<option value="' + key + '">' + value + '</option>');
-                                }
-                            });
-                    });
-                </script>
-HTML;
-        } else {
-            echo <<<HTML
-                                        <p>Error connecting to Okta API</p>
-HTML;
+            <script>
+            $(function() {
+                $('#user').select2({width: '100%'});
+            })
+            document.getElementById('group').addEventListener('change', function() {
+                var group = this.value, user = document.getElementById('user');
+                user.innerHTML = '';
+                // add loading animation
+                user.innerHTML = '<option value="">Please wait...</option>';
+                fetch('<?php echo $action ?>?action=getUsers&group=' + group)
+                    .then(response => response.json())
+                    .then(data => {
+                    $("#user").html('');
+                    $("#user").append('<option value="-1">-----</option>');
+                    for (const [key, value] of Object.entries(data)) {
+                        $("#user").append('<option value="' + key + '">' + value + '</option>');
+                    }
+                });
+            });
+            document.getElementById('regex_group_checkbox').addEventListener('change', function() {
+                    const value = this.checked;
+                    const dropdown = document.getElementById('group');
+                    const regex = document.getElementById('group_regex');
+
+                    if (value) {
+                        $(dropdown).hide();
+                        $(regex).show();
+                    } else {
+                        $(dropdown).show();
+                        $(regex).hide();
+                    }
+            });
+            </script>
+</div>
+<?php
         }
-        echo "</div>";
     }
 }
