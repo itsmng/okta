@@ -301,7 +301,7 @@ SQL;
 
     static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
         if (!$userId) {
-            foreach ($authorizedGroups as $group) {
+            foreach ($authorizedGroups as $key => $group) {
                 $userList = self::getUsersInGroup($group);
                 if (!$userList) {
                     return true;
@@ -311,6 +311,7 @@ SQL;
                         return false;
                     }
                 }
+                unset($authorizedGroups[$key]);
             }
         } else {
             if (!self::createOrUpdateUser($userId, $authorizedGroups, $fullImport)) {
