@@ -50,8 +50,10 @@ SQL;
             $addquery = <<<SQL
               INSERT INTO `$table` (name, value)
               VALUES ('url', ''),
-                     ('key', ''),
-                     ('duplicate', 'id')
+                  ('key', ''),
+                  ('duplicate', 'id'),
+                  ('use_group_regex', '0'),
+                  ('group_regex', '')
 SQL;
 
             $DB->queryOrDie($addquery, $DB->error());
