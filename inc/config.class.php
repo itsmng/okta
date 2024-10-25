@@ -64,8 +64,7 @@ SQL;
         } else if (PLUGIN_OKTA_VERSION == "1.3.3") {
             $query = <<<SQL
               INSERT INTO `$table` (name, value)
-              VALUES ('use_user_regex', '0'),
-                  ('user_regex', ''),
+              VALUES ('full_import', '0'),
                   ('use_group_regex', '0'),
                   ('group_regex', '')
 SQL;
@@ -115,6 +114,8 @@ SQL;
         $table = self::getTable();
         $fields = self::getConfigValues();
 
+        if (!isset($values['use_group_regex'])) $values['use_group_regex'] = false;
+        if (!isset($values['full_import'])) $values['full_import'] = false;
 
         foreach ($fields as $key => $value) {
             if (!isset($values[$key])) continue;
@@ -216,7 +217,7 @@ SQL;
         return $names;
     }
 
-    private static function createOrUpdateUser($userId, $groupId = -1) {
+    private static function createOrUpdateUser($userId, $groupId = -1, $fullImport = false) {
         global $DB;
 
         $apiMappings = [
@@ -263,47 +264,48 @@ SQL;
         $localUser = empty($localUser) ? false : $localUser[0];
 
         $ID = empty($localUser) ? false : $localUser['id'];
-        if (!$ID) {
-            $rule = new RuleRightCollection();
-            $input = [
-                'authtype' => Auth::EXTERNAL,
-                'name' => $profile[$apiMappings[$OidcMappings['name']]],
-                '_extauth' => 1,
-                'add' => 1
-            ];
-            $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
-                'type'   => Auth::EXTERNAL,
-                'email'  => $profile["email"] ?? '',
-                'login'  => $profile[$apiMappings[$OidcMappings['name']]],
-            ]);
-            $input['_ruleright_process'] = true;
+        if (!$ID || $fullImport ) {
+            if (!$ID) {
+                $rule = new RuleRightCollection();
+                $input = [
+                    'authtype' => Auth::EXTERNAL,
+                    'name' => $profile[$apiMappings[$OidcMappings['name']]],
+                    '_extauth' => 1,
+                    'add' => 1
+                ];
+                $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
+                    'type'   => Auth::EXTERNAL,
+                    'email'  => $profile["email"] ?? '',
+                    'login'  => $profile[$apiMappings[$OidcMappings['name']]],
+                ]);
+                $input['_ruleright_process'] = true;
 
-            $ID = $newUser->add($input);
-        }
-        $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
-        if ($groupId > 0) {
-            foreach ($userObject[$OidcMappings['group']] as $key => $group) {
-                if ($key != $groupId) {
-                    unset($userObject[$OidcMappings['group']][$key]);
-                }
+                $ID = $newUser->add($input);
             }
+            $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
+            if ($groupId > 0) {
+                foreach ($userObject[$OidcMappings['group']] as $key => $group) {
+                    if ($key != $groupId) {
+                        unset($userObject[$OidcMappings['group']][$key]);
+                    }
+                }
 
+            }
+            Oidc::addUserData($userObject, $ID);
         }
-        die(var_dump($userObject));
-        Oidc::addUserData($userObject, $ID);
         return true;
     }
 
-    static function importUser($userId, $groupId = null) {
+    static function importUser($userId, $groupId = null, $fullImport = false) {
         if ($userId <= 0) {
             $userList = self::getUsersInGroup($groupId);
             foreach ($userList as $user) {
-                if (!self::createOrUpdateUser($user['id'])) {
+                if (!self::createOrUpdateUser($user['id'], $fullImport)) {
                     return false;
                 }
             }
         } else {
-            if (!self::createOrUpdateUser($userId, $groupId)) {
+            if (!self::createOrUpdateUser($userId, $groupId, $fullImport)) {
                 return false;
             }
         }
@@ -339,11 +341,11 @@ SQL;
                         </tr>
                         <tr>
                             <td>API endpoint</td>
-                            <td><input type="text" name="url" value="{$fields['url']}"></td>
+                            <td><input type="text" name="url" value="<?php echo $fields['url'] ?>"></td>
                         </tr>
                         <tr>
                             <td>API key</td>
-                            <td><input type="text" name="key" value="{$key}"></td>
+                            <td><input type="text" name="key" value="<?php echo $key ?>"></td>
                         </tr>
                         <tr>
                             <td>Duplicate key</td>
@@ -382,8 +384,8 @@ SQL;
                                 </td>
                                 <td>Group</td>
                                 <td>
-                                    <input type="text" name="group_regex" id="group_regex" <?php echo !$fields['use_group_regex'] ? 'style="display: none"' : '' ?>>
-                                    <select name="group" id="group" <?php echo $fields['use_group_regex'] ? 'style="display: none"' : '' ?>>
+                                    <input type="text" name="group_regex" id="group_regex" <?php echo !$fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
+                                    <select name="group" id="group" <?php echo $fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
                                         <option value="">-----</option>
 <?php
             echo implode('', array_map(function($key, $value) use ($groups) {
@@ -402,12 +404,14 @@ SQL;
                                 </td>
                             </tr>
                             <tr>
-                                <td></td>
-                                <td class="center" colspan="2">
-                                    <input type="submit" name="import" class="submit" value="Import">
+                                <td>Update existing users</td>
+                                <td colspan='3'>
+                                    <input type="checkbox" name="full_import" <?php echo $fields['full_import'] ? 'checked' : '' ?>>
                                 </td>
-                                <td class="center" colspan="2">
-                                    <input type="submit" name="full_import" class="submit" value="Full import">
+                            </tr>
+                            <tr>
+                                <td class="center" colspan="4">
+                                    <input type="submit" name="import" class="submit" value="Import">
                                 </td>
                             </tr>
                         </tbody>
@@ -438,12 +442,18 @@ SQL;
                     const dropdown = document.getElementById('group');
                     const regex = document.getElementById('group_regex');
 
+                    $(dropdown).prop('disabled', !value)
+                    $(regex).prop('disabled', value)
                     if (value) {
                         $(dropdown).hide();
+                        $(dropdown).prop('disabled', true)
                         $(regex).show();
+                        $(regex).removeAttr('disabled')
                     } else {
                         $(dropdown).show();
+                        $(dropdown).removeAttr('disabled')
                         $(regex).hide();
+                        $(regex).prop('disabled', true)
                     }
             });
             </script>

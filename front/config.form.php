@@ -40,7 +40,7 @@ if($plugin->isActivated("okta")) {
         Session::checkRight("plugin_okta_config", UPDATE);
         $config::updateConfigValues($_POST);
         if (isset($_POST["import"])) {
-            if (!$config::importUser($_POST["user"], $_POST["group"])) {
+            if (!$config::importUser($_POST["user"], $_POST["group"], isset($_POST['full_import']))) {
                 Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
             } else {
                 Session::addMessageAfterRedirect(__('Users imported successfully', 'okta'));
