@@ -181,7 +181,7 @@ SQL;
         $groupsObjects = self::request("/api/v1/groups");
         $groups = [];
         foreach ($groupsObjects as $group) {
-            $groups[$group['id']] = $group['profile']['name'];
+            $groups[$group['id']] = addslashes($group['profile']['name']);
         }
         return $groups;
     }
@@ -216,7 +216,7 @@ SQL;
         $groups = self::request("/api/v1/users/" . $userId . "/groups");
         $names= [];
         foreach($groups as $group) {
-            $names[$group['id']] = $group['profile']['name'];
+            $names[$group['id']] = addslashes($group['profile']['name']);
         }
         return $names;
     }
