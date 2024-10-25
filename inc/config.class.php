@@ -221,7 +221,7 @@ SQL;
         return $names;
     }
 
-    private static function createOrUpdateUser($userId, $groupId = -1, $fullImport = false) {
+    private static function createOrUpdateUser($userId, $groupId = -1, $fullImport = false, $groupRegex = NULL) {
         global $DB;
 
         $apiMappings = [
@@ -289,8 +289,12 @@ SQL;
             $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
             if ($groupId > 0) {
                 foreach ($userObject[$OidcMappings['group']] as $key => $group) {
-                    if ($key != $groupId) {
+                    if ($groupId > 0 && $key != $groupId) {
                         unset($userObject[$OidcMappings['group']][$key]);
+                    } else if ($groupRegex != NULL) {
+                        if (!preg_match("/$groupRegex/i", $group)) {
+                            unset($userObject[$OidcMappings['group']][$key]);
+                        }
                     }
                 }
 
@@ -339,7 +343,7 @@ SQL;
         $key = Toolbox::sodiumDecrypt($fields['key']);
 
 ?>
-<div class='first-bloc'>";
+<div class='first-bloc'>
         <form method="post" action="<?php echo $action ?>}">
                 <table class="tab_cadre">
                     <tbody>
@@ -391,7 +395,7 @@ SQL;
                                 </td>
                                 <td>Group</td>
                                 <td>
-                                    <input type="text" name="group_regex" id="group_regex" <?php echo !$fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
+                                    <input type="text" name="group_regex" id="group_regex" value="<?php echo $fields['group_regex'] ?>" <?php echo !$fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
                                     <select name="group" id="group" <?php echo $fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
                                         <option value="">-----</option>
 <?php
