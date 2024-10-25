@@ -196,7 +196,6 @@ SQL;
                 $filteredGroups[$key] = $value;
             }
         }
-        die(json_encode($filteredGroups));
         return $filteredGroups;
     }
 
@@ -212,12 +211,12 @@ SQL;
         $groups = self::request("/api/v1/users/" . $userId . "/groups");
         $names= [];
         foreach($groups as $group) {
-            $names[] = $group['profile']['name'];
+            $names[$group['id']] = $group['profile']['name'];
         }
         return $names;
     }
 
-    private static function createOrUpdateUser($userId) {
+    private static function createOrUpdateUser($userId, $groupId = -1) {
         global $DB;
 
         $apiMappings = [
@@ -282,6 +281,15 @@ SQL;
             $ID = $newUser->add($input);
         }
         $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
+        if ($groupId > 0) {
+            foreach ($userObject[$OidcMappings['group']] as $key => $group) {
+                if ($key != $groupId) {
+                    unset($userObject[$OidcMappings['group']][$key]);
+                }
+            }
+
+        }
+        die(var_dump($userObject));
         Oidc::addUserData($userObject, $ID);
         return true;
     }
@@ -295,7 +303,7 @@ SQL;
                 }
             }
         } else {
-            if (!self::createOrUpdateUser($userId)) {
+            if (!self::createOrUpdateUser($userId, $groupId)) {
                 return false;
             }
         }
@@ -323,7 +331,7 @@ SQL;
 
 ?>
 <div class='first-bloc'>";
-            <form method="post" action="{$action}">
+        <form method="post" action="<?php echo $action ?>}">
                 <table class="tab_cadre">
                     <tbody>
                         <tr>
@@ -361,7 +369,7 @@ SQL;
                 <input type="hidden" name="_glpi_csrf_token" value="$csrf">
             </form>
 <?php if ($groups) { ?>
-                <form method="post" action="{$action}">
+            <form method="post" action="<?php echo $action ?>">
                     <table class="tab_cadre">
                         <tbody>
                             <tr>
@@ -404,7 +412,7 @@ SQL;
                             </tr>
                         </tbody>
                     </table>
-                    <input type="hidden" name="_glpi_csrf_token" value="$csrf">
+                    <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrf ?>">
                 </form>
             <script>
             $(function() {
