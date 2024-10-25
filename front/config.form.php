@@ -40,18 +40,28 @@ if($plugin->isActivated("okta")) {
         Session::checkRight("plugin_okta_config", UPDATE);
         $config::updateConfigValues($_POST);
         if (isset($_POST["import"])) {
-            if (!$config::importUser($_POST["user"], $_POST["group"], isset($_POST['full_import']))) {
-                Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
+            if (isset($_POST['use_group_regex'])) {
+                if (!isset($_POST['group_regex']) || empty($_POST['group_regex'])) {
+                    Session::addMessageAfterRedirect(__('Please provide a group regex', 'okta'), false, ERROR);
+                    Html::back();
+                }
+                $groups = $config::getGroupsByRegex($_POST["group_regex"]);
+                if (!$groups) {
+                    Session::addMessageAfterRedirect(__('Invalid regex', 'okta'), false, ERROR);
+                    Html::back();
+                }
+                foreach ($groups as $id => $group) {
+                    if (!$config::importUser(-1, $id)) {
+                        Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
+                    } else {
+                        Session::addMessageAfterRedirect(sprintf(__('Users from %s imported successfully', 'okta'), $group));
+                    }
+                }
             } else {
-                Session::addMessageAfterRedirect(__('Users imported successfully', 'okta'));
-            }
-        } else if (isset($_POST["import_regex"])) {
-            $groups = $config::getGroupsByRegex($_POST["regex"]);
-            foreach ($groups as $id => $group) {
-                if (!$config::importUser(-1, $id)) {
+                if (!$config::importUser($_POST["user"], $_POST["group"], isset($_POST['full_import']))) {
                     Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
                 } else {
-                    Session::addMessageAfterRedirect(sprintf(__('Users from %s imported successfully', 'okta'), $group));
+                    Session::addMessageAfterRedirect(__('Users imported successfully', 'okta'));
                 }
             }
         } else {

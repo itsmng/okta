@@ -166,7 +166,7 @@ SQL;
 
         $jsonResponse = json_decode($response, true);
 
-        if (!$response || count($jsonResponse) == 0) {
+        if (!$response) {
             Session::addMessageAfterRedirect(__('Error connecting to Okta API'), 'error');
             return false;
         } else if (isset($jsonResponse['errorCode'])) {
@@ -193,8 +193,12 @@ SQL;
         $filteredGroups = [];
 
         foreach ($groups as $key => $value) {
-            if (preg_match("/$regex/i", $value)) {
-                $filteredGroups[$key] = $value;
+            try {
+                if (preg_match("/$regex/i", $value)) {
+                    $filteredGroups[$key] = $value;
+                }
+            } catch (Exception $e) {
+                return false;
             }
         }
         return $filteredGroups;
@@ -299,6 +303,9 @@ SQL;
     static function importUser($userId, $groupId = null, $fullImport = false) {
         if ($userId <= 0) {
             $userList = self::getUsersInGroup($groupId);
+            if (!$userList) {
+                return true;
+            }
             foreach ($userList as $user) {
                 if (!self::createOrUpdateUser($user['id'], $fullImport)) {
                     return false;
