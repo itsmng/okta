@@ -36,37 +36,33 @@ $plugin = new Plugin();
 
 if($plugin->isActivated("okta")) {
     $config = new PluginOktaConfig();
-    if(isset($_POST["update"]) || isset($_POST["import"]) || isset($_POST["import_regex"])) {
+    if(isset($_POST["update"]) || isset($_POST["import"])) {
         Session::checkRight("plugin_okta_config", UPDATE);
         $config::updateConfigValues($_POST);
         if (isset($_POST["import"])) {
-            if (isset($_POST['use_group_regex'])) {
-                if (!isset($_POST['group_regex']) || empty($_POST['group_regex'])) {
-                    Session::addMessageAfterRedirect(__('Please provide a group regex', 'okta'), false, ERROR);
-                    Html::back();
-                }
-                $groups = $config::getGroupsByRegex($_POST["group_regex"]);
-                if (!$groups) {
-                    Session::addMessageAfterRedirect(__('Invalid regex', 'okta'), false, ERROR);
-                    Html::back();
-                }
-                foreach ($groups as $id => $group) {
-                    if (!$config::importUser(-1, $id)) {
-                        Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
-                    } else {
-                        Session::addMessageAfterRedirect(sprintf(__('Users from %s imported successfully', 'okta'), $group));
-                    }
-                }
-            } else {
-                if (!$config::importUser($_POST["user"], $_POST["group"], isset($_POST['full_import']))) {
-                    Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
-                } else {
-                    Session::addMessageAfterRedirect(__('Users imported successfully', 'okta'));
-                }
+            $group_regex = isset($_POST['use_group_regex']) ? $_POST['group_regex'] : '^' . $_POST['group'] . '$';
+            if (empty($group_regex)) {
+                Session::addMessageAfterRedirect(__('Please provide a group regex', 'okta'), false, ERROR);
+                Html::back();
             }
+            $groups = $config::getGroupsByRegex($_POST["group_regex"]);
+            if (!$groups) {
+                Session::addMessageAfterRedirect(sprintf(__('Invalid regex: %s', 'okta'), $_POST["group_regex"]), false, ERROR);
+                Html::back();
+            }
+            if (!$config::importUser(array_keys($groups),
+                isset($_POST['full_import']),
+                ($_POST['user'] == -1 ? NULL : $_POST['user']))) {
+                Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
+                Html::back();
+            } else {
+                Session::addMessageAfterRedirect(__('Users imported successfully', 'okta'));
+                Html::back();
+            };
         } else {
-            Session::addMessageAfterRedirect(__('Settings updated successfully', 'okta'));
-        };
+            Session::addMessageAfterRedirect(__('Users imported successfully', 'okta'));
+            Html::back();
+        }
     } else if (isset($_GET["action"]) && $_GET["action"] == "getUsers" && isset($_GET["group"])) {
         $group = $_GET["group"];
         $distantUsers = $config::getUsersInGroup($group);
@@ -80,10 +76,10 @@ if($plugin->isActivated("okta")) {
         }
         echo json_encode($users);
         die();
+    } else {
+        Html::header("Okta", $_SERVER["PHP_SELF"], "config", Plugin::class);
+        $config->showConfigForm();
     }
-
-    Html::header("Okta", $_SERVER["PHP_SELF"], "config", Plugin::class);
-    $config->showConfigForm();
 } else {
     Html::header("settings", '', "config", "plugins");
     echo "<div class='center'><br><br><img src=\"".$CFG_GLPI["root_doc"]."/pics/warning.png\" alt='warning'><br><br>";

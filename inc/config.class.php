@@ -214,6 +214,7 @@ SQL;
 
     static function getGroupsForUser($userId) {
         $groups = self::request("/api/v1/users/" . $userId . "/groups");
+
         $names= [];
         foreach($groups as $group) {
             $names[$group['id']] = addslashes($group['profile']['name']);
@@ -221,7 +222,7 @@ SQL;
         return $names;
     }
 
-    private static function createOrUpdateUser($userId, $groupId = -1, $fullImport = false, $groupRegex = NULL) {
+    private static function createOrUpdateUser($userId, $authorizedGroups = [], $fullImport = false) {
         global $DB;
 
         $apiMappings = [
@@ -287,36 +288,31 @@ SQL;
                 $ID = $newUser->add($input);
             }
             $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
-            if ($groupId > 0) {
-                foreach ($userObject[$OidcMappings['group']] as $key => $group) {
-                    if ($groupId > 0 && $key != $groupId) {
-                        unset($userObject[$OidcMappings['group']][$key]);
-                    } else if ($groupRegex != NULL) {
-                        if (!preg_match("/$groupRegex/i", $group)) {
-                            unset($userObject[$OidcMappings['group']][$key]);
-                        }
-                    }
+            foreach (array_keys($userObject[$OidcMappings['group']]) as $key) {
+                if (!in_array($key, $authorizedGroups)) {
+                    unset($userObject[$OidcMappings['group']][$key]);
                 }
-
             }
             Oidc::addUserData($userObject, $ID);
         }
         return true;
     }
 
-    static function importUser($userId, $groupId = null, $fullImport = false) {
-        if ($userId <= 0) {
-            $userList = self::getUsersInGroup($groupId);
-            if (!$userList) {
-                return true;
-            }
-            foreach ($userList as $user) {
-                if (!self::createOrUpdateUser($user['id'], $fullImport)) {
-                    return false;
+    static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
+        if (!$userId) {
+            foreach ($authorizedGroups as $group) {
+                $userList = self::getUsersInGroup($group);
+                if (!$userList) {
+                    return true;
+                }
+                foreach ($userList as $user) {
+                    if (!self::createOrUpdateUser($user['id'], $authorizedGroups, $fullImport)) {
+                        return false;
+                    }
                 }
             }
         } else {
-            if (!self::createOrUpdateUser($userId, $groupId, $fullImport)) {
+            if (!self::createOrUpdateUser($userId, $authorizedGroups, $fullImport)) {
                 return false;
             }
         }
@@ -344,7 +340,7 @@ SQL;
 
 ?>
 <div class='first-bloc'>
-        <form method="post" action="<?php echo $action ?>}">
+        <form method="post" action="<?php echo $action ?>">
                 <table class="tab_cadre">
                     <tbody>
                         <tr>
@@ -379,7 +375,7 @@ SQL;
                         </tr>
                     </tbody>
                 </table>
-                <input type="hidden" name="_glpi_csrf_token" value="$csrf">
+                <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrf ?>">
             </form>
 <?php if ($groups) { ?>
             <form method="post" action="<?php echo $action ?>">
