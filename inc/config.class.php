@@ -215,7 +215,7 @@ SQL;
         return self::request("/api/v1/groups/" . $group . "/users");
     }
 
-    private static function createOrUpdateUser($userId, $groups = [], $fullImport = false) {
+    private static function createOrUpdateUser($user, $fullImport = false) {
         global $DB;
 
         $apiMappings = [
@@ -244,20 +244,16 @@ SQL;
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
         if (!isset($OidcMappings[$OidcMappings[$config['duplicate']]])) return false;
 
-        $distantUser = self::fetchUserById($userId);
-        if (!$distantUser) return false;
         $userObject = [];
         foreach ($apiMappings as $key => $value) {
-            if (isset($distantUser['profile'][$value])) {
-                $userObject[$key] = $distantUser['profile'][$value];
+            if (isset($user[$value])) {
+                $userObject[$key] = $user[$value];
             }
         };
-        $profile = $distantUser['profile'];
-        $profile += ['id' => $distantUser['id']];
 
         $query = "SELECT glpi_users.id FROM glpi_users
             LEFT JOIN glpi_useremails ON glpi_users.id = glpi_useremails.users_id
-            WHERE " . $OidcTranslation[$config['duplicate']] . " = '" . $profile[$apiMappings[$config['duplicate']]] . "'";
+            WHERE " . $OidcTranslation[$config['duplicate']] . " = '" . $user[$apiMappings[$config['duplicate']]] . "'";
         $localUser = iterator_to_array($DB->query($query));
         $localUser = empty($localUser) ? false : $localUser[0];
 
@@ -267,20 +263,20 @@ SQL;
                 $rule = new RuleRightCollection();
                 $input = [
                     'authtype' => Auth::EXTERNAL,
-                    'name' => $profile[$apiMappings[$OidcMappings['name']]],
+                    'name' => $user[$apiMappings[$OidcMappings['name']]],
                     '_extauth' => 1,
                     'add' => 1
                 ];
                 $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
                     'type'   => Auth::EXTERNAL,
-                    'email'  => $profile["email"] ?? '',
-                    'login'  => $profile[$apiMappings[$OidcMappings['name']]],
+                    'email'  => $user["email"] ?? '',
+                    'login'  => $user[$apiMappings[$OidcMappings['name']]],
                 ]);
                 $input['_ruleright_process'] = true;
 
                 $ID = $newUser->add($input);
             }
-            $userObject[$OidcMappings['group']] = $groups;
+            $userObject[$OidcMappings['group']] = $user['group'];
             Oidc::addUserData($userObject, $ID);
         }
         return true;
@@ -296,13 +292,20 @@ SQL;
                     continue;
                 }
                 foreach ($usersInGroup as $user) {
-                    $userList[$user['id']][] = $authorizedGroups[$key];
+                    if (!isset($userList[$user['id']])) {
+                        $content = $user['profile'];
+                        $content += ['id' => $user['id']];
+                        $content['group'] = [$authorizedGroups[$key]];
+                        $userList[$user['id']] = $content;
+                    } else {
+                        $userList[$user['id']]['group'][] = $authorizedGroups[$key];
+                    }
                 }
             }
             echo "Retrieved " . count($userList) . " users\n";
             echo "Importing users...\n";
-            foreach ($userList as $id => $userGroups) {
-                if (!self::createOrUpdateUser($id, $userGroups, $fullImport)) {
+            foreach ($userList as $user) {
+                if (!self::createOrUpdateUser($user, $fullImport)) {
                     return false;
                 }
             }
