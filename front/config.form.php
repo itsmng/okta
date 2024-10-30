@@ -50,7 +50,7 @@ if($plugin->isActivated("okta")) {
                 Session::addMessageAfterRedirect(sprintf(__('Invalid regex: %s', 'okta'), $_POST["group_regex"]), false, ERROR);
                 Html::back();
             }
-            if (!$config::importUser(array_keys($groups),
+            if (!$config::importUser($groups,
                 isset($_POST['full_import']),
                 ($_POST['user'] == -1 ? NULL : $_POST['user']))) {
                 Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);

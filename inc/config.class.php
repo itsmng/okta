@@ -198,7 +198,7 @@ SQL;
             try {
                 $groupName = stripslashes($value);
                 if (preg_match("/$regex/i", $groupName)) {
-                    $filteredGroups[$key] = $groupName;
+                    $filteredGroups[$key] = addslashes($groupName);
                 }
             } catch (Exception $e) {
                 return false;
@@ -215,17 +215,7 @@ SQL;
         return self::request("/api/v1/groups/" . $group . "/users");
     }
 
-    static function getGroupsForUser($userId) {
-        $groups = self::request("/api/v1/users/" . $userId . "/groups");
-
-        $names= [];
-        foreach($groups as $group) {
-            $names[$group['id']] = addslashes($group['profile']['name']);
-        }
-        return $names;
-    }
-
-    private static function createOrUpdateUser($userId, $authorizedGroups = [], $fullImport = false) {
+    private static function createOrUpdateUser($userId, $groups = [], $fullImport = false) {
         global $DB;
 
         $apiMappings = [
@@ -290,12 +280,7 @@ SQL;
 
                 $ID = $newUser->add($input);
             }
-            $userObject[$OidcMappings['group']] = self::getGroupsForUser($userId);
-            foreach (array_keys($userObject[$OidcMappings['group']]) as $key) {
-                if (!in_array($key, $authorizedGroups)) {
-                    unset($userObject[$OidcMappings['group']][$key]);
-                }
-            }
+            $userObject[$OidcMappings['group']] = $groups;
             Oidc::addUserData($userObject, $ID);
         }
         return true;
@@ -303,17 +288,24 @@ SQL;
 
     static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
         if (!$userId) {
+            $userList = [];
+            echo "Retrieving users...\n";
             foreach ($authorizedGroups as $key => $group) {
-                $userList = self::getUsersInGroup($group);
-                if (!$userList) {
-                    return true;
+                $usersInGroup = self::getUsersInGroup($key);
+                if (!$usersInGroup || empty($usersInGroup)) {
+                    continue;
                 }
-                foreach ($userList as $user) {
-                    if (!self::createOrUpdateUser($user['id'], $authorizedGroups, $fullImport)) {
-                        return false;
-                    }
+                foreach ($usersInGroup as $user) {
+                    $userList[$user['id']][] = $authorizedGroups[$key];
                 }
-                unset($authorizedGroups[$key]);
+            }
+            echo "Retrieved " . count($userList) . " users\n";
+            echo "Importing users...\n";
+            foreach ($userList as $id => $userGroups) {
+                if (!self::createOrUpdateUser($id, $userGroups, $fullImport)) {
+                    return false;
+                }
+                echo "> imported user $userId\n";
             }
         } else {
             if (!self::createOrUpdateUser($userId, $authorizedGroups, $fullImport)) {
