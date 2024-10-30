@@ -35,6 +35,13 @@ function plugin_okta_install() {
    set_time_limit(900);
    ini_set('memory_limit', '2048M');
 
+   Crontask::register(PluginOktaConfig::class, 'ImportOktaUsers', DAY_TIMESTAMP, [
+       [
+           'comment' => 'Import users from Okta',
+           'mode'    => Crontask::MODE_EXTERNAL,
+       ]
+   ]);
+
    $classesToInstall = [
       'PluginOktaConfig',
       'PluginOktaProfile',

@@ -305,13 +305,26 @@ SQL;
                 if (!self::createOrUpdateUser($id, $userGroups, $fullImport)) {
                     return false;
                 }
-                echo "> imported user $userId\n";
             }
         } else {
             if (!self::createOrUpdateUser($userId, $authorizedGroups, $fullImport)) {
                 return false;
             }
         }
+        return true;
+    }
+
+    static function cronImportOktaUsers() {
+        $config = self::getConfigValues();
+        if ($config['use_group_regex']) {
+            $groups = self::getGroupsByRegex($config['group_regex']);
+            if (!$groups) {
+                return false;
+            }
+        } else {
+            $groups = [$config['group']];
+        }
+        self::importUser($groups, $config['full_import']);
         return true;
     }
 
