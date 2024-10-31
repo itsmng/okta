@@ -145,9 +145,6 @@ SQL;
         $table = self::getTable();
         $fields = self::getConfigValues();
 
-        if (!isset($values['use_group_regex'])) $values['use_group_regex'] = false;
-        if (!isset($values['full_import'])) $values['full_import'] = false;
-
         foreach ($fields as $key => $value) {
             if (!isset($values[$key])) continue;
             if ($key == 'key') {
@@ -453,7 +450,8 @@ SQL;
                             <tr>
                                 <td>Use Regex</td>
                                 <td>
-                                    <input type="checkbox" name="use_group_regex" id="regex_group_checkbox" <?php echo $fields['use_group_regex'] ? 'checked' : '' ?>>
+                                    <input type="hidden" name="use_group_regex" id="regex_group_checkbox" value='0'>
+                                    <input type="checkbox" name="use_group_regex" id="regex_group_checkbox" value='1' <?php echo $fields['use_group_regex'] ? 'checked' : '' ?>>
                                 </td>
                                 <td>Group</td>
                                 <td>
@@ -479,7 +477,8 @@ SQL;
                             <tr>
                                 <td>Update existing users</td>
                                 <td colspan='3'>
-                                    <input type="checkbox" name="full_import" <?php echo $fields['full_import'] ? 'checked' : '' ?>>
+                                    <input type="hidden" name="full_import" value='0' >
+                                    <input type="checkbox" name="full_import" value='1' <?php echo $fields['full_import'] ? 'checked' : '' ?>>
                                 </td>
                             </tr>
                             <tr>
