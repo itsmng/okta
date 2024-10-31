@@ -53,7 +53,19 @@ SQL;
                   ('key', ''),
                   ('duplicate', 'id'),
                   ('use_group_regex', '0'),
-                  ('group_regex', '')
+                  ('group_regex', ''),
+                  ('use_norm_id', '0'),
+                  ('use_norm_name', '0'),
+                  ('use_norm_given_name', '0'),
+                  ('use_norm_family_name', '0'),
+                  ('use_norm_email', '0'),
+                  ('use_norm_email', '0'),
+                  ('use_norm_phone_number', '0'),
+                  ('norm_id', ''),
+                  ('norm_name', ''),
+                  ('norm_given_name', ''),
+                  ('norm_family_name', ''),
+                  ('norm_phone_number', '')
 SQL;
 
             $DB->queryOrDie($addquery, $DB->error());
@@ -69,6 +81,23 @@ SQL;
               VALUES ('full_import', '0'),
                   ('use_group_regex', '0'),
                   ('group_regex', '')
+SQL;
+            $DB->queryOrDie($query, $DB->error());
+        } else if (PLUGIN_OKTA_VERSION == "1.4.3") {
+            $query = <<<SQL
+              INSERT INTO `$table` (name, value)
+              VALUES ('use_norm_id', '0'),
+                  ('use_norm_name', '0'),
+                  ('use_norm_given_name', '0'),
+                  ('use_norm_family_name', '0'),
+                  ('use_norm_email', '0'),
+                  ('use_norm_email', '0'),
+                  ('use_norm_phone_number', '0'),
+                  ('norm_id', ''),
+                  ('norm_name', ''),
+                  ('norm_given_name', ''),
+                  ('norm_family_name', ''),
+                  ('norm_phone_number', '')
 SQL;
             $DB->queryOrDie($query, $DB->error());
         }
@@ -373,13 +402,31 @@ SQL;
 <?php
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
         foreach ($OidcMappings as $key => $value) {
-            if (in_array($key, ['picture', 'locale', 'group'])) continue;
+            if (in_array($key, ['picture', 'locale', 'group', 'date_mod'])) {
+                unset($OidcMappings[$key]);
+                continue;
+            }
             echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key</option>";
         }
 ?>
                                 </select>
                             </td>
                         </tr>
+<?php foreach ($OidcMappings as $key => $value) { ?>
+                        <tr>
+                            <td>Normalize <?php echo $key; ?></td>
+                            <td>
+                                <input type="hidden" name="use_norm_<?php echo $key; ?>" value="0">
+                                <input type="checkbox" name="use_norm_<?php echo $key; ?>"
+                                    value="1" <?php echo ($fields['use_norm_' . $key] == 1) ? "checked" : ""; ?>
+                                    onclick="$('#normalize_<?php echo $key; ?>').prop('disabled', !this.checked);"
+                                >
+                                <input type="text" id="normalize_<?php echo $key; ?>" name="norm_<?php echo $key; ?>"
+                                    value="<?php echo $fields['norm_'.$key] ?? ""; ?>"
+                                    <?php echo ($fields['use_norm_'.$key] == 1) ? "" : "disabled"; ?>>
+                            </td>
+                        </tr>
+<?php } ?>
                         <tr>
                             <td class="center" colspan="2">
                                 <input type="submit" name="update" class="submit" value="Save">
