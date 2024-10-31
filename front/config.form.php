@@ -51,7 +51,7 @@ if($plugin->isActivated("okta")) {
                 Html::back();
             }
             if (!$config::importUser($groups,
-                isset($_POST['full_import']),
+                $_POST['full_import'] == 1,
                 ($_POST['user'] == -1 ? NULL : $_POST['user']))) {
                 Session::addMessageAfterRedirect(__('Could not import users', 'okta'), false, ERROR);
                 Html::back();
