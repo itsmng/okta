@@ -269,10 +269,17 @@ SQL;
 
         $config = self::getConfigValues();
 
-        $newUser = new User();
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
         if (!isset($OidcMappings[$OidcMappings[$config['duplicate']]])) return false;
 
+        foreach ($OidcTranslation as $key => $value) {
+           if ($config['use_norm_' . $key] == 1) {
+               $inputName = $apiMappings[$OidcMappings[$value]];
+               $user[$inputName] = preg_replace('/'.$config['norm_' . $key].'/', '', $user[$inputName]);
+           }
+        }
+
+        $newUser = new User();
         $userObject = [];
         foreach ($apiMappings as $key => $value) {
             if (isset($user[$value])) {
@@ -406,7 +413,7 @@ SQL;
                 unset($OidcMappings[$key]);
                 continue;
             }
-            echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key</option>";
+            echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key (" . $value . ")</option>";
         }
 ?>
                                 </select>
@@ -414,7 +421,7 @@ SQL;
                         </tr>
 <?php foreach ($OidcMappings as $key => $value) { ?>
                         <tr>
-                            <td>Normalize <?php echo $key; ?></td>
+                            <td>Normalize <?php echo $key . " (" . $value . ")"; ?></td>
                             <td>
                                 <input type="hidden" name="use_norm_<?php echo $key; ?>" value="0">
                                 <input type="checkbox" name="use_norm_<?php echo $key; ?>"
