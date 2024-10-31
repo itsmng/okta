@@ -343,7 +343,11 @@ SQL;
                 }
             }
         } else {
-            if (!self::createOrUpdateUser($userId, $authorizedGroups, $fullImport)) {
+            $userObject = self::request("api/v1/users/{$userId}");
+            $user = $userObject['profile'];
+            $user['id'] = $userId;
+            $user['group'] = $authorizedGroups;
+            if (!self::createOrUpdateUser($user, $authorizedGroups, $fullImport)) {
                 return false;
             }
         }
@@ -450,7 +454,7 @@ SQL;
                             <tr>
                                 <td>Use Regex</td>
                                 <td>
-                                    <input type="hidden" name="use_group_regex" id="regex_group_checkbox" value='0'>
+                                    <input type="hidden" name="use_group_regex" value='0'>
                                     <input type="checkbox" name="use_group_regex" id="regex_group_checkbox" value='1' <?php echo $fields['use_group_regex'] ? 'checked' : '' ?>>
                                 </td>
                                 <td>Group</td>
