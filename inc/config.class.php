@@ -274,6 +274,7 @@ SQL;
             if ($config['use_norm_' . $key] == 1) {
                 $inputName = self::$API_MAPPINGS[$OidcMappings[$value]];
                 $user[$inputName] = preg_replace('/'.$config['norm_' . $key].'/', '', $user[$inputName]);
+                if ($user[$inputName] == '') return false;
             }
         }
 
