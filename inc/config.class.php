@@ -31,7 +31,7 @@
  */
 class PluginOktaConfig extends CommonDBTM {
 
-    public $API_MAPPINGS = [
+    static public $API_MAPPINGS = [
         'sub' => 'id',
         'name' => 'displayName',
         'profile' => 'profileUrl',
@@ -42,7 +42,7 @@ class PluginOktaConfig extends CommonDBTM {
         'phone_number' => 'mobilePhone',
         'preferred_username' => 'login',
     ];
-    public $OIDC_TRANSLATION = [
+    static public $OIDC_TRANSLATION = [
         'id' => 'id',
         'name' => 'name',
         'given_name' => 'firstname',
@@ -312,8 +312,9 @@ SQL;
             }
             $userObject[$OidcMappings['group']] = $user['group'];
             Oidc::addUserData($userObject, $ID);
+            return $userObject;
         }
-        return $userObject ?? false;
+        return NULL;
     }
 
     static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
@@ -417,9 +418,8 @@ SQL;
         foreach ($OidcMappings as $key => $value) {
             if (!in_array($key, ['picture', 'locale', 'group', 'date_mod'])) {
                 $filteredMappings[$key] = $value;
-                continue;
+                echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key (" . $value . ")</option>";
             }
-            echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key (" . $value . ")</option>";
         }
 ?>
                                 </select>
@@ -440,7 +440,7 @@ SQL;
                                     onclick="$('#normalize_<?php echo $key; ?>').prop('disabled', !this.checked);"
                                 >
                                 <input type="text" id="normalize_<?php echo $key; ?>" name="norm_<?php echo $key; ?>"
-                                    value="<?php echo htmlspecialchars($fields['norm_'.$key]) ?? ""; ?>"
+                                    value="<?php echo htmlspecialchars($fields['norm_'.$key] ?? ""); ?>"
                                     <?php echo ($fields['use_norm_'.$key] == 1) ? "" : "disabled"; ?>>
                             </td>
                         </tr>
