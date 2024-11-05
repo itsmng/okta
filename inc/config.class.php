@@ -398,10 +398,10 @@ SQL;
                 <table class="tab_cadre">
                     <tbody>
                         <tr>
-                            <th colspan="2">Okta API Configuration</th>
+                            <th colspan="2"><?php echo __('Okta API Configuration', 'okta') ?></th>
                         </tr>
                         <tr>
-                            <td>API endpoint</td>
+                            <td><?php echo __('API endpoint', 'okta')?></td>
                             <td><input type="text" name="url" value="<?php echo $fields['url'] ?>"></td>
                         </tr>
                         <tr>
@@ -425,14 +425,14 @@ SQL;
                                 </select>
                             </td>
                         <tr>
-                            <th colspan="2">Text excluded from normalization</th>
+                            <th colspan="2"><?php echo __("Text excluded from normalization", "okta") ?></th>
                         </tr> 
                         <tr>
-                            <td colspan="2">example: <i>(@.*)$</i> will remove trailing emails when importing users</td>
+                            <td colspan="2"><?php echo __("example: (@.*)$ will remove trailing emails when importing users", 'okta')?></td>
                         </tr>
 <?php foreach ($filteredMappings as $key => $value) { ?>
                         <tr>
-                            <td>Normalize <?php echo $key . " (" . $value . ")"; ?></td>
+                            <td><?php echo __("Normalize", "okta") . " " . $key . " (" . $value . ")"; ?></td>
                             <td>
                                 <input type="hidden" name="use_norm_<?php echo $key; ?>" value="0">
                                 <input type="checkbox" name="use_norm_<?php echo $key; ?>"
@@ -447,7 +447,7 @@ SQL;
 <?php } ?>
                         </tr>
                             <td class="center" colspan="2">
-                                <input type="submit" name="update" class="submit" value="Save">
+                                <input type="submit" name="update" class="submit" value="<?php echo __('Save')?>">
                             </td>
                         </tr>
                     </tbody>
@@ -459,15 +459,15 @@ SQL;
                     <table class="tab_cadre">
                         <tbody>
                             <tr>
-                                <th colspan="4">Import users</th>
+                                <th colspan="4"><?php echo __("Import users", "okta") ?></th>
                             </tr>
                             <tr>
-                                <td>Use Regex</td>
+                                <td><?php echo __("Use Regex", "okta") ?></td>
                                 <td>
                                     <input type="hidden" name="use_group_regex" value='0'>
                                     <input type="checkbox" name="use_group_regex" id="regex_group_checkbox" value='1' <?php echo $fields['use_group_regex'] ? 'checked' : '' ?>>
                                 </td>
-                                <td>Group</td>
+                                <td><?php echo _n("Group", "Groups", 1) ?></td>
                                 <td>
                                     <input type="text" name="group_regex" id="group_regex" value="<?php echo $fields['group_regex'] ?>" <?php echo !$fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
                                     <select name="group" id="group" <?php echo $fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
@@ -481,7 +481,7 @@ SQL;
                                 </td>
                             </tr>
                             <tr>
-                                <td>User</td>
+                                <td><?php echo _n("User", "Users", 1) ?></td>
                                 <td colspan='3'>
                                     <select name="user" id="user">
                                         <option value="-1">-----</option>
@@ -489,7 +489,7 @@ SQL;
                                 </td>
                             </tr>
                             <tr>
-                                <td>Update existing users</td>
+                                <td><?php echo __('Update existing users', 'okta') ?></td>
                                 <td colspan='3'>
                                     <input type="hidden" name="full_import" value='0' >
                                     <input type="checkbox" name="full_import" value='1' <?php echo $fields['full_import'] ? 'checked' : '' ?>>
@@ -497,12 +497,12 @@ SQL;
                             </tr>
                             <tr>
                                 <td class="center" colspan="4">
-                                    <b>Please save before importing</b>
+                                    <b><?php echo __('Please save before importing', 'okta') ?></b>
                                 </td>
                             <tr>
                             <tr>
                                 <td class="center" colspan="4">
-                                    <input type="submit" name="import" class="submit" value="Import">
+                                    <input type="submit" name="import" class="submit" value="<?php echo __('Import', 'okta')?>">
                                 </td>
                             </tr>
                         </tbody>
@@ -513,7 +513,12 @@ SQL;
                 <table class="tab_cadre">
                     <tbody>
                         <tr>
-                            <th colspan="3">Users imported</th>
+                        <th colspan="3"><?php __('Users imported', 'okta'); ?></th>
+                        </tr>
+                        <tr>
+                        <th><?php echo __('Name'); ?></th>
+                        <th><?php echo __('Complete name'); ?></th>
+                        <th><?php echo _n('Group', 'Groups', 2); ?></th>
                         </tr>
                         <?php foreach ($_SESSION['okta_imported_users'] as $user) { ?>
                             <tr>

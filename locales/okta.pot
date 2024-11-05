@@ -1,0 +1,85 @@
+# English translations for PACKAGE package.
+# Copyright (C) 2021 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# Automatically generated, 2021.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2021-10-26 10:07+0200\n"
+"PO-Revision-Date: 2021-10-26 10:07+0200\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: en_GB\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: inc/config.class.php:401
+msgid "Okta API Configuration"
+msgstr ""
+
+#: inc/config.class.php:404
+msgid "API endpoint"
+msgstr ""
+
+#: inc/config.class.php:408
+msgid "API key"
+msgstr ""
+
+#: inc/config.class.php:412
+msgid "Duplicate key"
+msgstr ""
+
+#: inc/config.class.php:428
+msgid "Text excluded from normalization"
+msgstr ""
+
+#: inc/config.class.php:431
+msgid "example: (@.*)$ will remove trailing emails when importing users"    
+msgstr ""
+
+#: inc/config.class.php:435
+msgid "Normalize"
+msgstr ""
+
+#: inc/config.class.php:462
+msgid "Import users"
+msgstr ""
+
+#: inc/config.class.php:465
+msgid "Use Regex"
+msgstr ""
+
+#: inc/config.class.php:492
+msgid "Update existing users"
+msgstr ""
+
+#: inc/config.class.php:500
+msgid "Please save before importing"
+msgstr ""
+
+#: inc/config.class.php:505
+msgid "Import"
+msgstr ""
+
+#: inc/config.form.php: 45
+msgid "Please provide a group regex"
+msgstr ""
+
+#: inc/config.form.php: 50
+msgid "Invalid regex %s"
+msgstr ""
+
+#: inc/config.form.php: 59
+msgid "No user could be imported"
+msgstr ""
+
+#: inc/config.form.php: 63
+msgid "Users imported successfully"
+msgstr ""
+
+#: inc/config.form.php: 67
+msgid "Config updated successfully"
+msgstr ""
