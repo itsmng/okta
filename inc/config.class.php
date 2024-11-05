@@ -313,6 +313,7 @@ SQL;
             }
             $userObject[$OidcMappings['group']] = $user['group'];
             Oidc::addUserData($userObject, $ID);
+            $userObject['id'] = $ID;
             return $userObject;
         }
         return NULL;
@@ -523,7 +524,7 @@ SQL;
                         </tr>
                         <?php foreach ($_SESSION['okta_imported_users'] as $user) { ?>
                             <tr>
-                                <td><?php echo $user[$OidcMappings['name']] ?></td>
+                                <td><a href="<?php echo User::getFormURLWithID($user['id']); ?>"><?php echo $user[$OidcMappings['name']] ?></a></td>
                                 <td><?php echo $user[$OidcMappings['given_name']] . ' ' . $user[$OidcMappings['family_name']] ?></td>
                                 <td><?php 
                                     foreach ($user[$OidcMappings['group']] as $group) {
