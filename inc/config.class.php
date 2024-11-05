@@ -30,6 +30,27 @@
  * ---------------------------------------------------------------------
  */
 class PluginOktaConfig extends CommonDBTM {
+
+    public $API_MAPPINGS = [
+        'sub' => 'id',
+        'name' => 'displayName',
+        'profile' => 'profileUrl',
+        'nickname' => 'nickName',
+        'family_name' => 'lastName',
+        'given_name' => 'firstName',
+        'email' => 'email',
+        'phone_number' => 'mobilePhone',
+        'preferred_username' => 'login',
+    ];
+    public $OIDC_TRANSLATION = [
+        'id' => 'id',
+        'name' => 'name',
+        'given_name' => 'firstname',
+        'family_name' => 'realname',
+        'phone_number' => 'phone',
+        'email' => 'email'
+    ];
+
     static function install() {
         global $DB;
 
@@ -145,7 +166,7 @@ SQL;
         $table = self::getTable();
         $fields = self::getConfigValues();
 
-        foreach ($fields as $key => $value) {
+        foreach (array_keys($fields) as $key) {
             if (!isset($values[$key])) continue;
             if ($key == 'key') {
                 $values[$key] = Toolbox::sodiumEncrypt($values[$key]);
@@ -244,41 +265,21 @@ SQL;
     private static function createOrUpdateUser($user, $fullImport = false) {
         global $DB;
 
-        $apiMappings = [
-            'sub' => 'id',
-            'name' => 'displayName',
-            'profile' => 'profileUrl',
-            'nickname' => 'nickName',
-            'family_name' => 'lastName',
-            'given_name' => 'firstName',
-            'email' => 'email',
-            'phone_number' => 'mobilePhone',
-            'preferred_username' => 'login',
-        ];
-        $OidcTranslation = [
-            'id' => 'id',
-            'name' => 'name',
-            'given_name' => 'firstname',
-            'family_name' => 'realname',
-            'phone_number' => 'phone',
-            'email' => 'email'
-        ];
-
         $config = self::getConfigValues();
 
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
         if (!isset($OidcMappings[$OidcMappings[$config['duplicate']]])) return false;
 
-        foreach ($OidcTranslation as $key => $value) {
-           if ($config['use_norm_' . $key] == 1) {
-               $inputName = $apiMappings[$OidcMappings[$value]];
-               $user[$inputName] = preg_replace('/'.$config['norm_' . $key].'/', '', $user[$inputName]);
-           }
+        foreach (self::$OIDC_TRANSLATION as $key => $value) {
+            if ($config['use_norm_' . $key] == 1) {
+                $inputName = self::$API_MAPPINGS[$OidcMappings[$value]];
+                $user[$inputName] = preg_replace('/'.$config['norm_' . $key].'/', '', $user[$inputName]);
+            }
         }
 
         $newUser = new User();
         $userObject = [];
-        foreach ($apiMappings as $key => $value) {
+        foreach (self::$API_MAPPINGS as $key => $value) {
             if (isset($user[$value])) {
                 $userObject[$key] = $user[$value];
             }
@@ -286,7 +287,7 @@ SQL;
 
         $query = "SELECT glpi_users.id FROM glpi_users
             LEFT JOIN glpi_useremails ON glpi_users.id = glpi_useremails.users_id
-            WHERE " . $OidcTranslation[$config['duplicate']] . " = '" . $user[$apiMappings[$config['duplicate']]] . "'";
+            WHERE " . self::$OIDC_TRANSLATION[$config['duplicate']] . " = '" . $user[self::$API_MAPPINGS[$config['duplicate']]] . "'";
         $localUser = iterator_to_array($DB->query($query));
         $localUser = empty($localUser) ? false : $localUser[0];
 
@@ -296,14 +297,14 @@ SQL;
                 $rule = new RuleRightCollection();
                 $input = [
                     'authtype' => Auth::EXTERNAL,
-                    'name' => $user[$apiMappings[$OidcMappings['name']]],
+                    'name' => $user[self::$API_MAPPINGS[$OidcMappings['name']]],
                     '_extauth' => 1,
                     'add' => 1
                 ];
                 $input = $rule->processAllRules([], Toolbox::stripslashes_deep($input), [
                     'type'   => Auth::EXTERNAL,
                     'email'  => $user["email"] ?? '',
-                    'login'  => $user[$apiMappings[$OidcMappings['name']]],
+                    'login'  => $user[self::$API_MAPPINGS[$OidcMappings['name']]],
                 ]);
                 $input['_ruleright_process'] = true;
 
@@ -312,10 +313,11 @@ SQL;
             $userObject[$OidcMappings['group']] = $user['group'];
             Oidc::addUserData($userObject, $ID);
         }
-        return true;
+        return $userObject ?? false;
     }
 
     static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
+        $importedUsers = [];
         if (!$userId) {
             $userList = [];
             echo "Retrieving users...\n";
@@ -338,8 +340,9 @@ SQL;
             echo "Retrieved " . count($userList) . " users\n";
             echo "Importing users...\n";
             foreach ($userList as $user) {
-                if (!self::createOrUpdateUser($user, $fullImport)) {
-                    return false;
+                $importedUser = self::createOrUpdateUser($user, $fullImport);
+                if ($importedUser) {
+                    $importedUsers[] = $importedUser;
                 }
             }
         } else {
@@ -347,11 +350,12 @@ SQL;
             $user = $userObject['profile'];
             $user['id'] = $userId;
             $user['group'] = $authorizedGroups;
-            if (!self::createOrUpdateUser($user, $authorizedGroups, $fullImport)) {
-                return false;
+            $importedUser = self::createOrUpdateUser($user, $authorizedGroups, $fullImport);
+            if ($importedUser) {
+                $importedUsers[] = $importedUser;
             }
         }
-        return true;
+        return $importedUsers;
     }
 
     static function cronImportOktaUsers() {
@@ -409,9 +413,10 @@ SQL;
                                 <select name="duplicate">
 <?php
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
+        $filteredMappings = [];
         foreach ($OidcMappings as $key => $value) {
-            if (in_array($key, ['picture', 'locale', 'group', 'date_mod'])) {
-                unset($OidcMappings[$key]);
+            if (!in_array($key, ['picture', 'locale', 'group', 'date_mod'])) {
+                $filteredMappings[$key] = $value;
                 continue;
             }
             echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key (" . $value . ")</option>";
@@ -419,8 +424,10 @@ SQL;
 ?>
                                 </select>
                             </td>
+                        <tr>
+                            <th colspan="2">Text excluded from normalization</th>
                         </tr>
-<?php foreach ($OidcMappings as $key => $value) { ?>
+<?php foreach ($filteredMappings as $key => $value) { ?>
                         <tr>
                             <td>Normalize <?php echo $key . " (" . $value . ")"; ?></td>
                             <td>
@@ -435,7 +442,7 @@ SQL;
                             </td>
                         </tr>
 <?php } ?>
-                        <tr>
+                        </tr>
                             <td class="center" colspan="2">
                                 <input type="submit" name="update" class="submit" value="Save">
                             </td>
@@ -463,9 +470,9 @@ SQL;
                                     <select name="group" id="group" <?php echo $fields['use_group_regex'] ? 'style="display: none" disabled' : '' ?>>
                                         <option value="">-----</option>
 <?php
-            foreach($groups as $key => $group) {
-                echo "<option value='".htmlspecialchars(stripslashes($group))."' data-gid='".$key."'>".stripslashes($group)."</option>";
-            }
+        foreach($groups as $key => $group) {
+            echo "<option value='".htmlspecialchars(stripslashes($group))."' data-gid='".$key."'>".stripslashes($group)."</option>";
+        }
 ?>
                                     </select>
                                 </td>
@@ -487,6 +494,11 @@ SQL;
                             </tr>
                             <tr>
                                 <td class="center" colspan="4">
+                                    <b>Please save before importing</b>
+                                </td>
+                            <tr>
+                            <tr>
+                                <td class="center" colspan="4">
                                     <input type="submit" name="import" class="submit" value="Import">
                                 </td>
                             </tr>
@@ -494,10 +506,32 @@ SQL;
                     </table>
                     <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrf ?>">
                 </form>
-            <script>
-            $(function() {
-                $('#user').select2({width: '100%'});
-            })
+            <?php if (isset($_SESSION['okta_imported_users'])) { ?>
+                <table class="tab_cadre">
+                    <tbody>
+                        <tr>
+                            <th colspan="3">Users imported</th>
+                        </tr>
+                        <?php foreach ($_SESSION['okta_imported_users'] as $user) { ?>
+                            <tr>
+                                <td><?php echo $user[$OidcMappings['name']] ?></td>
+                                <td><?php echo $user[$OidcMappings['given_name']] . ' ' . $user[$OidcMappings['family_name']] ?></td>
+                                <td><?php 
+                                    foreach ($user[$OidcMappings['group']] as $group) {
+                                        echo stripslashes($group) . ', ';
+                                    }
+                                ?></td>
+                            </tr>
+                        <?php } 
+                           unset($_SESSION['okta_imported_users']);
+                        ?>
+                    </tbody>
+                </table>
+            <?php } ?>
+        <script>
+        $(function() {
+            $('#user').select2({width: '100%'});
+        })
             document.getElementById('group').addEventListener('change', function() {
                 var group = this.querySelector('option:checked').getAttribute('data-gid');
                 var user = document.getElementById('user');
@@ -514,28 +548,28 @@ SQL;
                     }
                 });
             });
-            document.getElementById('regex_group_checkbox').addEventListener('change', function() {
-                    const value = this.checked;
-                    const dropdown = document.getElementById('group');
-                    const regex = document.getElementById('group_regex');
+        document.getElementById('regex_group_checkbox').addEventListener('change', function() {
+            const value = this.checked;
+            const dropdown = document.getElementById('group');
+            const regex = document.getElementById('group_regex');
 
-                    $(dropdown).prop('disabled', !value)
-                    $(regex).prop('disabled', value)
-                    if (value) {
-                        $(dropdown).hide();
-                        $(dropdown).prop('disabled', true)
+            $(dropdown).prop('disabled', !value)
+                $(regex).prop('disabled', value)
+                if (value) {
+                    $(dropdown).hide();
+                    $(dropdown).prop('disabled', true)
                         $(regex).show();
-                        $(regex).removeAttr('disabled')
-                    } else {
-                        $(dropdown).show();
-                        $(dropdown).removeAttr('disabled')
+                    $(regex).removeAttr('disabled')
+                } else {
+                    $(dropdown).show();
+                    $(dropdown).removeAttr('disabled')
                         $(regex).hide();
-                        $(regex).prop('disabled', true)
-                    }
-            });
-            </script>
+                    $(regex).prop('disabled', true)
+                }
+        });
+        </script>
 </div>
 <?php
-        }
+                                    }
     }
 }
