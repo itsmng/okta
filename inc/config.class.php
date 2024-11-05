@@ -426,6 +426,9 @@ SQL;
                             </td>
                         <tr>
                             <th colspan="2">Text excluded from normalization</th>
+                        </tr> 
+                        <tr>
+                            <td colspan="2">example: <i>(@.*)$</i> will remove trailing emails when importing users</td>
                         </tr>
 <?php foreach ($filteredMappings as $key => $value) { ?>
                         <tr>
@@ -437,7 +440,7 @@ SQL;
                                     onclick="$('#normalize_<?php echo $key; ?>').prop('disabled', !this.checked);"
                                 >
                                 <input type="text" id="normalize_<?php echo $key; ?>" name="norm_<?php echo $key; ?>"
-                                    value="<?php echo $fields['norm_'.$key] ?? ""; ?>"
+                                    value="<?php echo htmlspecialchars($fields['norm_'.$key]) ?? ""; ?>"
                                     <?php echo ($fields['use_norm_'.$key] == 1) ? "" : "disabled"; ?>>
                             </td>
                         </tr>
