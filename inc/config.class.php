@@ -43,7 +43,6 @@ class PluginOktaConfig extends CommonDBTM {
         'preferred_username' => 'login',
     ];
     static public $OIDC_TRANSLATION = [
-        'id' => 'id',
         'name' => 'name',
         'given_name' => 'firstname',
         'family_name' => 'realname',
@@ -75,6 +74,7 @@ SQL;
                   ('duplicate', 'id'),
                   ('use_group_regex', '0'),
                   ('group_regex', ''),
+                  ('full_import', '0'),
                   ('use_norm_id', '0'),
                   ('use_norm_name', '0'),
                   ('use_norm_given_name', '0'),
@@ -87,6 +87,18 @@ SQL;
                   ('norm_given_name', ''),
                   ('norm_family_name', ''),
                   ('norm_phone_number', '')
+                  ('use_filter_id', '0'),
+                  ('use_filter_name', '0'),
+                  ('use_filter_given_name', '0'),
+                  ('use_filter_family_name', '0'),
+                  ('use_filter_email', '0'),
+                  ('use_filter_phone_number', '0'),
+                  ('filter_id', ''),
+                  ('filter_name', ''),
+                  ('filter_given_name', ''),
+                  ('filter_family_name', ''),
+                  ('filter_email', ''),
+                  ('filter_phone_number', '')
 SQL;
 
             $DB->queryOrDie($addquery, $DB->error());
@@ -119,6 +131,23 @@ SQL;
                   ('norm_given_name', ''),
                   ('norm_family_name', ''),
                   ('norm_phone_number', '')
+SQL;
+            $DB->queryOrDie($query, $DB->error());
+        } else if (PLUGIN_OKTA_VERSION == "1.5.0") {
+            $query = <<<SQL
+              INSERT INTO `$table` (name, value)
+              VALUES ('use_filter_id', '0'),
+                  ('use_filter_name', '0'),
+                  ('use_filter_given_name', '0'),
+                  ('use_filter_family_name', '0'),
+                  ('use_filter_email', '0'),
+                  ('use_filter_phone_number', '0'),
+                  ('filter_id', ''),
+                  ('filter_name', ''),
+                  ('filter_given_name', ''),
+                  ('filter_family_name', ''),
+                  ('filter_email', ''),
+                  ('filter_phone_number', '')
 SQL;
             $DB->queryOrDie($query, $DB->error());
         }
@@ -229,8 +258,10 @@ SQL;
     static function getGroups() {
         $groupsObjects = self::request("/api/v1/groups");
         $groups = [];
-        foreach ($groupsObjects as $group) {
-            $groups[$group['id']] = addslashes($group['profile']['name']);
+        if ($groupsObjects) {
+            foreach ($groupsObjects as $group) {
+                $groups[$group['id']] = addslashes($group['profile']['name']);
+            }
         }
         return $groups;
     }
@@ -262,21 +293,26 @@ SQL;
         return self::request("/api/v1/groups/" . $group . "/users");
     }
 
-    private static function createOrUpdateUser($user, $fullImport = false) {
+    private static function createOrUpdateUser($user, $config, $fullImport = false) {
         global $DB;
 
-        $config = self::getConfigValues();
-
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
-        if (!isset($OidcMappings[$OidcMappings[$config['duplicate']]])) return false;
 
         foreach (self::$OIDC_TRANSLATION as $key => $value) {
+            $inputName = self::$API_MAPPINGS[$OidcMappings[$key]];
             if ($config['use_norm_' . $key] == 1) {
-                $inputName = self::$API_MAPPINGS[$OidcMappings[$value]];
                 $user[$inputName] = preg_replace('/'.$config['norm_' . $key].'/', '', $user[$inputName]);
                 if ($user[$inputName] == '') return false;
             }
+            if ($config['use_filter_' . $key] == 1) {
+                if (!preg_match('/'.$config['filter_' . $key].'/', $user[$inputName])) {
+                    return false;
+                }
+            }
         }
+
+        $mappingName = self::$API_MAPPINGS[$OidcMappings[$config['duplicate']]];
+        if (!isset($user[$mappingName])) return false;
 
         $newUser = new User();
         $userObject = [];
@@ -288,7 +324,7 @@ SQL;
 
         $query = "SELECT glpi_users.id FROM glpi_users
             LEFT JOIN glpi_useremails ON glpi_users.id = glpi_useremails.users_id
-            WHERE " . self::$OIDC_TRANSLATION[$config['duplicate']] . " = '" . $user[self::$API_MAPPINGS[$config['duplicate']]] . "'";
+            WHERE " . self::$OIDC_TRANSLATION[$config['duplicate']] . " = '" . $user[$mappingName] . "'";
         $localUser = iterator_to_array($DB->query($query));
         $localUser = empty($localUser) ? false : $localUser[0];
 
@@ -321,6 +357,7 @@ SQL;
 
     static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
         $importedUsers = [];
+        $config = self::getConfigValues();
         if (!$userId) {
             $userList = [];
             echo "Retrieving users...\n";
@@ -343,7 +380,7 @@ SQL;
             echo "Retrieved " . count($userList) . " users\n";
             echo "Importing users...\n";
             foreach ($userList as $user) {
-                $importedUser = self::createOrUpdateUser($user, $fullImport);
+                $importedUser = self::createOrUpdateUser($user, $config, $fullImport);
                 if ($importedUser) {
                     $importedUsers[] = $importedUser;
                 }
@@ -353,7 +390,7 @@ SQL;
             $user = $userObject['profile'];
             $user['id'] = $userId;
             $user['group'] = $authorizedGroups;
-            $importedUser = self::createOrUpdateUser($user, $authorizedGroups, $fullImport);
+            $importedUser = self::createOrUpdateUser($user, $config, $fullImport);
             if ($importedUser) {
                 $importedUsers[] = $importedUser;
             }
@@ -400,25 +437,25 @@ SQL;
                 <table class="tab_cadre">
                     <tbody>
                         <tr>
-                            <th colspan="2"><?php echo __('Okta API Configuration', 'okta') ?></th>
+                            <th colspan="5"><?php echo __('Okta API Configuration', 'okta') ?></th>
                         </tr>
                         <tr>
-                            <td><?php echo __('API endpoint', 'okta')?></td>
-                            <td><input type="text" name="url" value="<?php echo $fields['url'] ?>"></td>
+                            <td colspan="2"><?php echo __('API endpoint', 'okta')?></td>
+                            <td colspan="3"><input type="text" name="url" value="<?php echo $fields['url'] ?>"></td>
                         </tr>
                         <tr>
-                            <td>API key</td>
-                            <td><input type="text" name="key" value="<?php echo $key ?>"></td>
+                            <td colspan="2">API key</td>
+                            <td colspan="3"><input type="text" name="key" value="<?php echo $key ?>"></td>
                         </tr>
                         <tr>
-                            <td>Duplicate key</td>
-                            <td>
+                            <td colspan="2">Duplicate key</td>
+                            <td colspan="3">
                                 <select name="duplicate">
 <?php
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
         $filteredMappings = [];
         foreach ($OidcMappings as $key => $value) {
-            if (!in_array($key, ['picture', 'locale', 'group', 'date_mod'])) {
+            if (!in_array($key, ['picture', 'locale', 'group', 'date_mod', 'id'])) {
                 $filteredMappings[$key] = $value;
                 echo "<option value=\"$key\" ". (($key == $fields['duplicate']) ? "selected" : "") ." >$key (" . $value . ")</option>";
             }
@@ -427,14 +464,15 @@ SQL;
                                 </select>
                             </td>
                         <tr>
-                            <th colspan="2"><?php echo __("Text excluded from normalization", "okta") ?></th>
+                            <th colspan="5"><?php echo __("Text excluded from normalization", "okta") ?></th>
                         </tr> 
                         <tr>
-                            <td colspan="2"><?php echo __("example: (@.*)$ will remove trailing emails when importing users", 'okta')?></td>
+                            <td colspan="5"><?php echo __("example: (@.*)$ will remove trailing emails when importing users", 'okta')?></td>
                         </tr>
 <?php foreach ($filteredMappings as $key => $value) { ?>
                         <tr>
-                            <td><?php echo __("Normalize", "okta") . " " . $key . " (" . $value . ")"; ?></td>
+                            <td><?php echo $key . " (" . $value . ") "; ?></td>
+                            <td> <?php echo __("Normalize", "okta"); ?></td>
                             <td>
                                 <input type="hidden" name="use_norm_<?php echo $key; ?>" value="0">
                                 <input type="checkbox" name="use_norm_<?php echo $key; ?>"
@@ -445,10 +483,21 @@ SQL;
                                     value="<?php echo htmlspecialchars($fields['norm_'.$key] ?? ""); ?>"
                                     <?php echo ($fields['use_norm_'.$key] == 1) ? "" : "disabled"; ?>>
                             </td>
+                            <td><?php echo __("Filter", "okta") ?></td>
+                            <td>
+                                <input type="hidden" name="use_filter_<?php echo $key; ?>" value="0">
+                                <input type="checkbox" name="use_filter_<?php echo $key; ?>"
+                                    value="1" <?php echo ($fields['use_filter_' . $key] == 1) ? "checked" : ""; ?>
+                                    onclick="$('#filter_<?php echo $key; ?>').prop('disabled', !this.checked);"
+                                >
+                                <input type="text" id="filter_<?php echo $key; ?>" name="filter_<?php echo $key; ?>"
+                                    value="<?php echo htmlspecialchars($fields['filter_'.$key] ?? ""); ?>"
+                                    <?php echo ($fields['use_filter_'.$key] == 1) ? "" : "disabled"; ?>>
+                            </td>
                         </tr>
 <?php } ?>
                         </tr>
-                            <td class="center" colspan="2">
+                            <td class="center" colspan="5">
                                 <input type="submit" name="update" class="submit" value="<?php echo __('Save')?>">
                             </td>
                         </tr>
