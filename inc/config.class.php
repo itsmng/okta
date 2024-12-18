@@ -75,6 +75,7 @@ SQL;
                   ('use_group_regex', '0'),
                   ('group_regex', ''),
                   ('full_import', '0'),
+                  ('deactivate', '0'),
                   ('use_norm_id', '0'),
                   ('use_norm_name', '0'),
                   ('use_norm_given_name', '0'),
@@ -148,6 +149,12 @@ SQL;
                   ('filter_family_name', ''),
                   ('filter_email', ''),
                   ('filter_phone_number', '')
+SQL;
+            $DB->queryOrDie($query, $DB->error());
+        } else if (PLUGIN_OKTA_VERSION == "1.6.0") {
+            $query = <<<SQL
+              INSERT INTO `$table` (name, value)
+              VALUES ('deactivate', '0')
 SQL;
             $DB->queryOrDie($query, $DB->error());
         }
@@ -356,6 +363,8 @@ SQL;
     }
 
     static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
+        global $DB;
+
         $importedUsers = [];
         $config = self::getConfigValues();
         if (!$userId) {
@@ -383,6 +392,20 @@ SQL;
                 $importedUser = self::createOrUpdateUser($user, $config, $fullImport);
                 if ($importedUser) {
                     $importedUsers[] = $importedUser;
+                }
+            }
+            if ($config['deactivate'] == 1) {
+                $users = iterator_to_array($DB->request([
+                    'SELECT' => ['id'],
+                    'FROM'   => 'glpi_users',
+                ]));
+                $importedIds = array_map(function($user) {
+                    return $user['id'];
+                }, $importedUsers);
+                foreach ($users as $user) {
+                    if (!in_array($user['id'], $importedIds)) {
+                        $DB->updateOrDie('glpi_users', ['is_active' => 0], ['id' => $user['id']]);
+                    }
                 }
             }
         } else {
@@ -541,9 +564,14 @@ SQL;
                             </tr>
                             <tr>
                                 <td><?php echo __('Update existing users', 'okta') ?></td>
-                                <td colspan='3'>
+                                <td>
                                     <input type="hidden" name="full_import" value='0' >
                                     <input type="checkbox" name="full_import" value='1' <?php echo $fields['full_import'] ? 'checked' : '' ?>>
+                                </td>
+                                <td><?php echo __('Deactivate non imported users', 'okta') ?></td>
+                                <td>
+                                    <input type="hidden" name="deactivate" value='0' >
+                                    <input type="checkbox" name="deactivate" value='1' <?php echo $fields['deactivate'] ? 'checked' : '' ?>>
                                 </td>
                             </tr>
                             <tr>
@@ -591,22 +619,22 @@ SQL;
         $(function() {
             $('#user').select2({width: '100%'});
         })
-            document.getElementById('group').addEventListener('change', function() {
-                var group = this.querySelector('option:checked').getAttribute('data-gid');
-                var user = document.getElementById('user');
-                user.innerHTML = '';
-                // add loading animation
-                user.innerHTML = '<option value="">Please wait...</option>';
-                fetch('<?php echo $action ?>?action=getUsers&group=' + group)
-                    .then(response => response.json())
-                    .then(data => {
-                    $("#user").html('');
-                    $("#user").append('<option value="-1">-----</option>');
-                    for (const [key, value] of Object.entries(data)) {
-                        $("#user").append('<option value="' + key + '">' + value + '</option>');
-                    }
-                });
+        document.getElementById('group').addEventListener('change', function() {
+            var group = this.querySelector('option:checked').getAttribute('data-gid');
+            var user = document.getElementById('user');
+            user.innerHTML = '';
+            // add loading animation
+            user.innerHTML = '<option value="">Please wait...</option>';
+            fetch('<?php echo $action ?>?action=getUsers&group=' + group)
+                .then(response => response.json())
+                .then(data => {
+                $("#user").html('');
+                $("#user").append('<option value="-1">-----</option>');
+                for (const [key, value] of Object.entries(data)) {
+                    $("#user").append('<option value="' + key + '">' + value + '</option>');
+                }
             });
+        });
         document.getElementById('regex_group_checkbox').addEventListener('change', function() {
             const value = this.checked;
             const dropdown = document.getElementById('group');
