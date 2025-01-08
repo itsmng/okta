@@ -81,13 +81,12 @@ SQL;
                   ('use_norm_given_name', '0'),
                   ('use_norm_family_name', '0'),
                   ('use_norm_email', '0'),
-                  ('use_norm_email', '0'),
                   ('use_norm_phone_number', '0'),
                   ('norm_id', ''),
                   ('norm_name', ''),
                   ('norm_given_name', ''),
                   ('norm_family_name', ''),
-                  ('norm_phone_number', '')
+                  ('norm_phone_number', ''),
                   ('use_filter_id', '0'),
                   ('use_filter_name', '0'),
                   ('use_filter_given_name', '0'),
@@ -357,15 +356,17 @@ SQL;
             $userObject[$OidcMappings['group']] = $user['group'];
             Oidc::addUserData($userObject, $ID);
             $userObject['id'] = $ID;
-            return $userObject;
+            return [$userObject, $userObject];
         }
-        return NULL;
+        $userObject['id'] = $ID;
+        return [$userObject, NULL];
     }
 
     static function importUser($authorizedGroups, $fullImport = false, $userId = NULL) {
         global $DB;
 
         $importedUsers = [];
+        $listedUsers = [];
         $config = self::getConfigValues();
         if (!$userId) {
             $userList = [];
@@ -389,7 +390,10 @@ SQL;
             echo "Retrieved " . count($userList) . " users\n";
             echo "Importing users...\n";
             foreach ($userList as $user) {
-                $importedUser = self::createOrUpdateUser($user, $config, $fullImport);
+                [$listedUser, $importedUser] = self::createOrUpdateUser($user, $config, $fullImport);
+                if ($listedUser) {
+                    $listedUsers[] = $listedUser;
+                }
                 if ($importedUser) {
                     $importedUsers[] = $importedUser;
                 }
@@ -399,11 +403,11 @@ SQL;
                     'SELECT' => ['id'],
                     'FROM'   => 'glpi_users',
                 ]));
-                $importedIds = array_map(function($user) {
+                $listedIds = array_map(function($user) {
                     return $user['id'];
-                }, $importedUsers);
+                }, $listedUsers);
                 foreach ($users as $user) {
-                    if (!in_array($user['id'], $importedIds)) {
+                    if (!in_array($user['id'], $listedIds)) {
                         $DB->updateOrDie('glpi_users', ['is_active' => 0], ['id' => $user['id']]);
                     }
                 }
@@ -519,24 +523,12 @@ SQL;
                             </td>
                         </tr>
 <?php } ?>
-                        </tr>
-                            <td class="center" colspan="5">
-                                <input type="submit" name="update" class="submit" value="<?php echo __('Save')?>">
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-                <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrf ?>">
-            </form>
 <?php if ($groups) { ?>
-            <form method="post" action="<?php echo $action ?>">
-                    <table class="tab_cadre">
-                        <tbody>
                             <tr>
-                                <th colspan="4"><?php echo __("Import users", "okta") ?></th>
+                                <th colspan="6"><?php echo __("Import users", "okta") ?></th>
                             </tr>
                             <tr>
-                                <td><?php echo __("Use Regex", "okta") ?></td>
+                                <td colspan="2"><?php echo __("Use Regex", "okta") ?></td>
                                 <td>
                                     <input type="hidden" name="use_group_regex" value='0'>
                                     <input type="checkbox" name="use_group_regex" id="regex_group_checkbox" value='1' <?php echo $fields['use_group_regex'] ? 'checked' : '' ?>>
@@ -555,7 +547,7 @@ SQL;
                                 </td>
                             </tr>
                             <tr>
-                                <td><?php echo _n("User", "Users", 1) ?></td>
+                                <td colspan="2"><?php echo _n("User", "Users", 1) ?></td>
                                 <td colspan='3'>
                                     <select name="user" id="user">
                                         <option value="-1">-----</option>
@@ -563,7 +555,7 @@ SQL;
                                 </td>
                             </tr>
                             <tr>
-                                <td><?php echo __('Update existing users', 'okta') ?></td>
+                                <td colspan="2"><?php echo __('Update existing users', 'okta') ?></td>
                                 <td>
                                     <input type="hidden" name="full_import" value='0' >
                                     <input type="checkbox" name="full_import" value='1' <?php echo $fields['full_import'] ? 'checked' : '' ?>>
@@ -575,12 +567,10 @@ SQL;
                                 </td>
                             </tr>
                             <tr>
-                                <td class="center" colspan="4">
-                                    <b><?php echo __('Please save before importing', 'okta') ?></b>
+                                <td class="center" colspan="3">
+                                    <input type="submit" name="update" class="submit" value="<?php echo __('Save')?>">
                                 </td>
-                            <tr>
-                            <tr>
-                                <td class="center" colspan="4">
+                                <td class="center" colspan="2">
                                     <input type="submit" name="import" class="submit" value="<?php echo __('Import', 'okta')?>">
                                 </td>
                             </tr>
