@@ -83,3 +83,7 @@ msgstr "Utilisateurs importés avec succès"
 #: inc/config.form.php: 67
 msgid "Config updated successfully"
 msgstr "Configuration mise à jour avec succès"
+
+#: inc/config.form.php: 563
+msgid "Deactivate unlisted users"
+msgstr "Désactiver les utilisateurs non listés"

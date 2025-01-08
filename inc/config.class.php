@@ -457,7 +457,8 @@ SQL;
         $groups = self::getGroups();
 
         $key = Toolbox::sodiumDecrypt($fields['key']);
-
+        $cronTask = new CronTask();
+        $cronTask->getFromDBByCrit(['name' => 'ImportOktaUsers']);
 ?>
 <div class='first-bloc'>
         <form method="post" action="<?php echo $action ?>">
@@ -560,12 +561,15 @@ SQL;
                                     <input type="hidden" name="full_import" value='0' >
                                     <input type="checkbox" name="full_import" value='1' <?php echo $fields['full_import'] ? 'checked' : '' ?>>
                                 </td>
-                                <td><?php echo __('Deactivate non imported users', 'okta') ?></td>
+                                <td><?php echo __('Deactivate unlisted users', 'okta') ?></td>
                                 <td>
                                     <input type="hidden" name="deactivate" value='0' >
                                     <input type="checkbox" name="deactivate" value='1' <?php echo $fields['deactivate'] ? 'checked' : '' ?>>
                                 </td>
                             </tr>
+                            <tr class="center">
+                                <td colspan="5">
+                                    <a href="<?php echo $cronTask->getLinkURL() ?>"><?php echo CronTask::getTypeName() ?></a>
                             <tr>
                                 <td class="center" colspan="3">
                                     <input type="submit" name="update" class="submit" value="<?php echo __('Save')?>">
