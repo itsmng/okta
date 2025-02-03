@@ -219,13 +219,27 @@ SQL;
     static private function request($uri, $method = 'GET', $body = null) {
         $ch = curl_init();
         $values = self::getConfigValues();
-        $url = $values['url'];
         $key = Toolbox::sodiumDecrypt($values['key']);
+        $responseHeader = [];
+        $url = $values['url'];
+        if (strpos($uri, $url) === false) {
+            $url = $url . '/' . $uri;
+        } else {
+            $url = $uri;
+        }
 
-
-        curl_setopt($ch, CURLOPT_URL, $url . '/' . $uri);
+        curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$responseHeader) {
+            $len = strlen($header);
+            $header = explode(':', $header, 2);
+            if (count($header) == 2) {
+                $responseHeader[strtolower(trim($header[0]))][] = trim($header[1]);
+            }
+            return $len;
+        });
 
         $headers = [
             'Accept: application/json',
@@ -239,6 +253,8 @@ SQL;
         }
 
         $response = curl_exec($ch);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $responseBody = substr($response, $headerSize);
 
         if (curl_errno($ch)) {
             Session::addMessageAfterRedirect(__('Error connecting to Okta API: ' . curl_error($ch)), 'error');
@@ -248,21 +264,21 @@ SQL;
 
         curl_close($ch);
 
-        $jsonResponse = json_decode($response, true);
+        $jsonResponse = json_decode($responseBody, true);
 
         if (!$response) {
             Session::addMessageAfterRedirect(__('Error connecting to Okta API'), 'error');
             return false;
-        } else if (isset($jsonResponse['errorCode'])) {
+        } else if (isset($jsonResponse['errorCode']) || !$jsonResponse) {
             Session::addMessageAfterRedirect(__('Invalid API key'), 'error');
             return false;
         }
 
-        return $jsonResponse;
+        return ['header' => $responseHeader, 'body' => $jsonResponse];
     }
 
     static function getGroups() {
-        $groupsObjects = self::request("/api/v1/groups");
+        $groupsObjects = self::request("/api/v1/groups")['body'];
         $groups = [];
         if ($groupsObjects) {
             foreach ($groupsObjects as $group) {
@@ -292,11 +308,37 @@ SQL;
     }
 
     static function fetchUserById($id) {
-        return self::request("/api/v1/users/" . $id);
+        return self::request("/api/v1/users/" . $id)['body'];
+    }
+
+    static function parseLinkHeader($linkHeader) {
+        $links = [];
+        foreach ($linkHeader as $part) {
+            if (preg_match('/<(.*?)>;\s*rel="(.*?)"/', $part, $matches)) {
+                $matches[1] = html_entity_decode($matches[1]);
+                $links[$matches[2]] = $matches[1];
+            }
+        }
+        return $links;
     }
 
     static function getUsersInGroup($group) {
-        return self::request("/api/v1/groups/" . $group . "/users");
+        $uri = "/api/v1/groups/" . $group . "/users";
+        $response = [];
+        while ($uri) {
+            $currentList = self::request($uri);
+            $links = self::parseLinkHeader($currentList['header']['link']);
+            if (!isset($currentList['body'])) {
+                return $response;
+            }
+            $response = array_merge($response, $currentList['body']);
+            if (isset($links['next'])) {
+                $uri = $links['next'];
+            } else {
+                return $response;
+            }
+        }
+        return $response;
     }
 
     private static function createOrUpdateUser($user, $config, $fullImport = false) {
@@ -402,7 +444,7 @@ SQL;
                 $users = iterator_to_array($DB->request([
                     'SELECT' => ['id'],
                     'FROM'   => 'glpi_users',
-                ]));
+                ]))['body'];
                 $listedIds = array_map(function($user) {
                     return $user['id'];
                 }, $listedUsers);
@@ -413,7 +455,7 @@ SQL;
                 }
             }
         } else {
-            $userObject = self::request("api/v1/users/{$userId}");
+            $userObject = self::request("api/v1/users/{$userId}")['body'];
             $user = $userObject['profile'];
             $user['id'] = $userId;
             $user['group'] = $authorizedGroups;
@@ -571,16 +613,18 @@ SQL;
                                 <td colspan="5">
                                     <a href="<?php echo $cronTask->getLinkURL() ?>"><?php echo CronTask::getTypeName() ?></a>
                             <tr>
+<?php } ?>
                                 <td class="center" colspan="3">
                                     <input type="submit" name="update" class="submit" value="<?php echo __('Save')?>">
                                 </td>
+                                <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrf ?>">
+<?php if ($groups) { ?>
                                 <td class="center" colspan="2">
                                     <input type="submit" name="import" class="submit" value="<?php echo __('Import', 'okta')?>">
                                 </td>
                             </tr>
                         </tbody>
                     </table>
-                    <input type="hidden" name="_glpi_csrf_token" value="<?php echo $csrf ?>">
                 </form>
             <?php if (isset($_SESSION['okta_imported_users'])) { ?>
                 <table class="tab_cadre">
