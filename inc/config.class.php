@@ -444,7 +444,7 @@ SQL;
                 $users = iterator_to_array($DB->request([
                     'SELECT' => ['id'],
                     'FROM'   => 'glpi_users',
-                ]))['body'];
+                ]));
                 $listedIds = array_map(function($user) {
                     return $user['id'];
                 }, $listedUsers);
