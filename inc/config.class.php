@@ -444,6 +444,7 @@ SQL;
                 $users = iterator_to_array($DB->request([
                     'SELECT' => ['id'],
                     'FROM'   => 'glpi_users',
+                    'WHERE'  => ['is_active' => 1, 'authtype' => Auth::EXTERNAL],
                 ]));
                 $listedIds = array_map(function($user) {
                     return $user['id'];
