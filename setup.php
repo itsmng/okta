@@ -30,7 +30,7 @@
  * ---------------------------------------------------------------------
  */
 
-define('PLUGIN_OKTA_VERSION', '1.6.3');
+define('PLUGIN_OKTA_VERSION', '1.6.4');
 
 if (!defined("PLUGIN_OKTA_DIR")) {
    define("PLUGIN_OKTA_DIR", Plugin::getPhpDir("okta"));
