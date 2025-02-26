@@ -156,6 +156,12 @@ SQL;
               VALUES ('deactivate', '0')
 SQL;
             $DB->queryOrDie($query, $DB->error());
+        } else if (PLUGIN_OKTA_VERSION == "1.6.6") {
+            $query = <<<SQL
+              INSERT INTO `$table` (name, value)
+              VALUES ('ldap_update', '0')
+SQL;
+            $DB->queryOrDie($query, $DB->error());
         }
 
         return true;
@@ -327,6 +333,9 @@ SQL;
         $response = [];
         while ($uri) {
             $currentList = self::request($uri);
+            if (!isset($currentList['header']['link'])) {
+                return $response;
+            }
             $links = self::parseLinkHeader($currentList['header']['link']);
             if (!isset($currentList['body'])) {
                 return $response;
@@ -441,10 +450,18 @@ SQL;
                 }
             }
             if ($config['deactivate'] == 1) {
+                $where = ['authtype' => Auth::EXTERNAL];
+                if ($config['ldap_update'] == 1) {
+                    $where['OR'] = [
+                        ['authtype' => Auth::LDAP],
+                        ['authtype' => Auth::EXTERNAL]
+                    ];
+                    unset($where['authtype']);
+                }
                 $users = iterator_to_array($DB->request([
                     'SELECT' => ['id', 'is_active'],
                     'FROM'   => 'glpi_users',
-                    'WHERE'  => ['authtype' => Auth::EXTERNAL],
+                    'WHERE'  => $where,
                 ]));
                 $listedIds = array_map(function($user) {
                     return $user['id'];
@@ -601,7 +618,7 @@ SQL;
                                 </td>
                             </tr>
                             <tr>
-                                <td colspan="2"><?php echo __('Update existing users', 'okta') ?></td>
+                                <td><?php echo __('Update existing users', 'okta') ?></td>
                                 <td>
                                     <input type="hidden" name="full_import" value='0' >
                                     <input type="checkbox" name="full_import" value='1' <?php echo $fields['full_import'] ? 'checked' : '' ?>>
@@ -610,6 +627,11 @@ SQL;
                                 <td>
                                     <input type="hidden" name="deactivate" value='0' >
                                     <input type="checkbox" name="deactivate" value='1' <?php echo $fields['deactivate'] ? 'checked' : '' ?>>
+                                </td>
+                                <td><?php echo __('Activate/Deactivate LDAP users', 'okta') ?></td>
+                                <td>
+                                    <input type="hidden" name="ldap_update" value='0' >
+                                    <input type="checkbox" name="ldap_update" value='1' <?php echo $fields['ldap_update'] ? 'checked' : '' ?>>
                                 </td>
                             </tr>
                             <tr class="center">
