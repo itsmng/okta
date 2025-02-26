@@ -386,8 +386,17 @@ SQL;
         $localUser = empty($localUser) ? false : $localUser[0];
 
         $ID = empty($localUser) ? false : $localUser['id'];
+        if (!$ID) {
+           $checkQuery = "SELECT glpi_users.id FROM glpi_users
+               WHERE name = '" . $user[self::$API_MAPPINGS[$OidcMappings['name']]] . "'";
+           $isNameAlreadyTaken = iterator_to_array($DB->query($checkQuery));
+           if (isset($isNameAlreadyTaken[0]['id'])) {
+               $ID = $isNameAlreadyTaken[0]['id'];
+           }
+        }
         if (!$ID || $fullImport ) {
             if (!$ID) {
+                $localUser = iterator_to_array($DB->query($query));
                 $rule = new RuleRightCollection();
                 $input = [
                     'authtype' => Auth::EXTERNAL,
