@@ -442,16 +442,18 @@ SQL;
             }
             if ($config['deactivate'] == 1) {
                 $users = iterator_to_array($DB->request([
-                    'SELECT' => ['id'],
+                    'SELECT' => ['id', 'is_active'],
                     'FROM'   => 'glpi_users',
-                    'WHERE'  => ['is_active' => 1, 'authtype' => Auth::EXTERNAL],
+                    'WHERE'  => ['authtype' => Auth::EXTERNAL],
                 ]));
                 $listedIds = array_map(function($user) {
                     return $user['id'];
                 }, $listedUsers);
                 foreach ($users as $user) {
-                    if (!in_array($user['id'], $listedIds)) {
+                    if (!in_array($user['id'], $listedIds) && $user['is_active'] == 1) {
                         $DB->updateOrDie('glpi_users', ['is_active' => 0], ['id' => $user['id']]);
+                    } else if (in_array($user['id'], $listedIds) && $user['is_active'] == 0) {
+                        $DB->updateOrDie('glpi_users', ['is_active' => 1], ['id' => $user['id']]);
                     }
                 }
             }
