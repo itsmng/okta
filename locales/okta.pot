@@ -87,3 +87,7 @@ msgstr ""
 #: inc/config.form.php: 563
 msgid "Deactivate unlisted users"
 msgstr ""
+
+#: inc/config.class.php: 640
+msgid "Activate/Deactivate LDAP users"
+msgstr ""

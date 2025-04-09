@@ -87,3 +87,7 @@ msgstr "Configuration mise à jour avec succès"
 #: inc/config.form.php: 563
 msgid "Deactivate unlisted users"
 msgstr "Désactiver les utilisateurs non listés"
+
+#: inc/config.class.php: 640
+msgid "Activate/Deactivate LDAP users"
+msgstr "Activer/Désactiver les utilisateurs LDAP"

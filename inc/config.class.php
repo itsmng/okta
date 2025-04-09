@@ -634,13 +634,16 @@ SQL;
                                 </td>
                                 <td><?php echo __('Deactivate unlisted users', 'okta') ?></td>
                                 <td>
-                                    <input type="hidden" name="deactivate" value='0' >
-                                    <input type="checkbox" name="deactivate" value='1' <?php echo $fields['deactivate'] ? 'checked' : '' ?>>
+                                    <input type="hidden" name="deactivate" value='0'>
+                                    <input type="checkbox" name="deactivate" value='1' id="deactivate-checkbox" <?php echo $fields['deactivate'] ? 'checked' : '' ?>>
                                 </td>
                                 <td><?php echo __('Activate/Deactivate LDAP users', 'okta') ?></td>
                                 <td>
-                                    <input type="hidden" name="ldap_update" value='0' >
-                                    <input type="checkbox" name="ldap_update" value='1' <?php echo $fields['ldap_update'] ? 'checked' : '' ?>>
+                                    <input type="hidden" name="ldap_update" value='0'>
+                                    <input type="checkbox" name="ldap_update" value='1' id="ldap-checkbox"
+                                        <?php echo $fields['ldap_update'] ? 'checked' : '' ?>
+                                        <?php echo (!isset($fields['deactivate']) || !$fields['deactivate']) ? 'disabled' : '' ?>
+                                    >
                                 </td>
                             </tr>
                             <tr class="center">
@@ -691,6 +694,9 @@ SQL;
         $(function() {
             $('#user').select2({width: '100%'});
         })
+        document.getElementById('deactivate-checkbox').addEventListener('change', function() {
+            $('#ldap-checkbox').prop('disabled', !this.checked);
+        });
         document.getElementById('group').addEventListener('change', function() {
             var group = this.querySelector('option:checked').getAttribute('data-gid');
             var user = document.getElementById('user');
