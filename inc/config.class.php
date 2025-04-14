@@ -388,7 +388,7 @@ SQL;
         $ID = empty($localUser) ? false : $localUser['id'];
         if (!$ID) {
            $checkQuery = "SELECT glpi_users.id FROM glpi_users
-               WHERE name = '" . $user[self::$API_MAPPINGS[$OidcMappings['name']]] . "' AND authtype = " . Auth::EXTERNAL;
+               WHERE name = '" . $user[self::$API_MAPPINGS[$OidcMappings['name']]] . "' AND authtype IN (" . Auth::EXTERNAL . ", " . Auth::LDAP . ")";
            $isNameAlreadyTaken = iterator_to_array($DB->query($checkQuery));
            if (isset($isNameAlreadyTaken[0]['id'])) {
                $ID = $isNameAlreadyTaken[0]['id'];
