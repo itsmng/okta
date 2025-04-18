@@ -356,6 +356,9 @@ SQL;
         $OidcMappings = iterator_to_array($DB->query("SELECT * FROM glpi_oidc_mapping"))[0];
 
         foreach (self::$OIDC_TRANSLATION as $key => $value) {
+            if (!isset($OidcMappings[$key]) || !isset(self::$API_MAPPINGS[$OidcMappings[$key]])) {
+                continue;
+            }
             $inputName = self::$API_MAPPINGS[$OidcMappings[$key]];
             if ($config['use_norm_' . $key] == 1) {
                 $user[$inputName] = preg_replace('/'.$config['norm_' . $key].'/', '', $user[$inputName]);
