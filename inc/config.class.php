@@ -41,13 +41,15 @@ class PluginOktaConfig extends CommonDBTM {
         'email' => 'email',
         'phone_number' => 'mobilePhone',
         'preferred_username' => 'login',
+        'manager' => 'manager',
     ];
     static public $OIDC_TRANSLATION = [
         'name' => 'name',
         'given_name' => 'firstname',
         'family_name' => 'realname',
         'phone_number' => 'phone',
-        'email' => 'email'
+        'email' => 'email',
+        'manager' => 'users_id_supervisor'
     ];
 
     static function install() {
@@ -314,7 +316,7 @@ SQL;
     }
 
     static function fetchUserById($id) {
-        return self::request("/api/v1/users/" . $id)['body'];
+        return self::request("/api/v1/users/" . $id . "?expand=manager")['body'];
     }
 
     static function parseLinkHeader($linkHeader) {
@@ -329,7 +331,7 @@ SQL;
     }
 
     static function getUsersInGroup($group) {
-        $uri = "/api/v1/groups/" . $group . "/users";
+        $uri = "/api/v1/groups/" . $group . "/users?expand=manager";  // MODIFIER CETTE LIGNE
         $response = [];
         while ($uri) {
             $currentList = self::request($uri);
@@ -370,6 +372,21 @@ SQL;
                 }
             }
         }
+
+    // Manager processing
+    $managerId = null;
+    if (isset($user['manager']) && isset($user['manager']['id'])) {
+        $managerLogin = isset($user['manager']['profile']['login']) ? $user['manager']['profile']['login'] : '';
+        if (!empty($managerLogin)) {
+            $managerQuery = "SELECT glpi_users.id FROM glpi_users 
+                            WHERE name = '" . $DB->escape($managerLogin) . "' 
+                            AND authtype IN (" . Auth::EXTERNAL . ", " . Auth::LDAP . ")";
+            $managerResult = iterator_to_array($DB->query($managerQuery));
+            if (!empty($managerResult)) {
+                $managerId = $managerResult[0]['id'];
+            }
+        }
+    }
 
         $mappingName = self::$API_MAPPINGS[$OidcMappings[$config['duplicate']]];
         if (!isset($user[$mappingName])) return false;
@@ -417,10 +434,25 @@ SQL;
                 $ID = $newUser->add($input);
             }
             $userObject[$OidcMappings['group']] = $user['group'];
+        
+            if ($managerId) {
+                $userObject['users_id_supervisor'] = $managerId;
+            }
+        
             Oidc::addUserData($userObject, $ID);
+            
+            if ($managerId) {
+                $DB->updateOrDie('glpi_users', ['users_id_supervisor' => $managerId], ['id' => $ID]);
+            }
+        
             $userObject['id'] = $ID;
             return [$userObject, $userObject];
         }
+    
+        if ($fullImport && $managerId) {
+            $DB->updateOrDie('glpi_users', ['users_id_supervisor' => $managerId], ['id' => $ID]);
+        }
+    
         $userObject['id'] = $ID;
         return [$userObject, NULL];
     }
