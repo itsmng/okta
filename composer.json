@@ -1,0 +1,24 @@
+{
+    "name": "itsmng/okta",
+    "description": "Okta integration plugin for ITSM-NG",
+    "type": "glpi-plugin",
+    "license": "GPL-3.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "GlpiPlugin\\Okta\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "GlpiPlugin\\Okta\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "ITSM Dev Team"
+        }
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    }
+}

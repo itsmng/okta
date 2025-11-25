@@ -30,7 +30,9 @@
  * ---------------------------------------------------------------------
  */
 
-define('PLUGIN_OKTA_VERSION', '1.6.7');
+use GlpiPlugin\Okta\PluginOktaProfile;
+
+define('PLUGIN_OKTA_VERSION', '1.7.0');
 
 if (!defined("PLUGIN_OKTA_DIR")) {
    define("PLUGIN_OKTA_DIR", Plugin::getPhpDir("okta"));
@@ -39,13 +41,20 @@ if (!defined("PLUGIN_OKTA_WEB_DIR")) {
    define("PLUGIN_OKTA_WEB_DIR", Plugin::getWebDir("okta"));
 }
 
+// Register PSR-4 autoloader for plugin namespace
+$hostLoader = require __DIR__ . '/../../vendor/autoload.php';
+$hostLoader->addPsr4(
+    'GlpiPlugin\\Okta\\',
+    __DIR__ . '/src/'
+);
+
 function plugin_init_okta() {
     global $PLUGIN_HOOKS;
 
     $PLUGIN_HOOKS['csrf_compliant']['okta'] = true;
-    $PLUGIN_HOOKS['change_profile']['okta'] = array('PluginOktaProfile', 'changeProfile');
+    $PLUGIN_HOOKS['change_profile']['okta'] = [PluginOktaProfile::class, 'changeProfile'];
 
-    Plugin::registerClass('PluginOktaProfile', ['addtabon' => array('Profile')]);
+    Plugin::registerClass(PluginOktaProfile::class, ['addtabon' => ['Profile']]);
 
     if (Session::haveRight("profile", UPDATE)) {
         $PLUGIN_HOOKS['config_page']['okta'] = 'front/config.form.php';

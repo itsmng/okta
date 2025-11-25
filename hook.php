@@ -30,91 +30,68 @@
  * ---------------------------------------------------------------------
  */
 
+use GlpiPlugin\Okta\PluginOktaConfig;
+use GlpiPlugin\Okta\PluginOktaProfile;
 
 function plugin_okta_install() {
-   set_time_limit(900);
-   ini_set('memory_limit', '2048M');
+    set_time_limit(900);
+    ini_set('memory_limit', '2048M');
 
-   Crontask::register(PluginOktaConfig::class, 'ImportOktaUsers', DAY_TIMESTAMP, [
-       [
-           'comment' => 'Import users from Okta',
-           'mode'    => Crontask::MODE_EXTERNAL,
-       ]
-   ]);
+    Crontask::register(PluginOktaConfig::class, 'ImportOktaUsers', DAY_TIMESTAMP, [
+        [
+            'comment' => 'Import users from Okta',
+            'mode'    => Crontask::MODE_EXTERNAL,
+        ]
+    ]);
 
-   $classesToInstall = [
-      'PluginOktaConfig',
-      'PluginOktaProfile',
-   ];
+    $classesToInstall = [
+        PluginOktaConfig::class,
+        PluginOktaProfile::class,
+    ];
 
-   echo "<center>";
-   echo "<table class='tab_cadre_fixe'>";
-   echo "<tr><th>".__("MySQL tables installation", "okta")."<th></tr>";
+    echo "<center>";
+    echo "<table class='tab_cadre_fixe'>";
+    echo "<tr><th>" . __("MySQL tables installation", "okta") . "<th></tr>";
 
-   echo "<tr class='tab_bg_1'>";
-   echo "<td align='center'>";
+    echo "<tr class='tab_bg_1'>";
+    echo "<td align='center'>";
 
-   //load all classes
-   $dir  = PLUGIN_OKTA_DIR . "/inc/";
-   foreach ($classesToInstall as $class) {
-      if ($plug = isPluginItemType($class)) {
-         $item = strtolower($plug['class']);
-         if (file_exists("$dir$item.class.php")) {
-            include_once ("$dir$item.class.php");
-         }
-      }
-   }
+    // Install each class
+    foreach ($classesToInstall as $class) {
+        if (!call_user_func([$class, 'install'])) {
+            return false;
+        }
+    }
 
-   //install
-   foreach ($classesToInstall as $class) {
-      if ($plug = isPluginItemType($class)) {
-         $item =strtolower($plug['class']);
-         if (file_exists("$dir$item.class.php")) {
-            if (!call_user_func([$class,'install'])) {
-               return false;
-            }
-         }
-      }
-   }
+    echo "</td>";
+    echo "</tr>";
+    echo "</table></center>";
 
-   echo "</td>";
-   echo "</tr>";
-   echo "</table></center>";
-
-   return true;
+    return true;
 }
 
 function plugin_okta_uninstall() {
-   echo "<center>";
-   echo "<table class='tab_cadre_fixe'>";
-   echo "<tr><th>".__("MySQL tables uninstallation", "fields")."<th></tr>";
+    echo "<center>";
+    echo "<table class='tab_cadre_fixe'>";
+    echo "<tr><th>" . __("MySQL tables uninstallation", "okta") . "<th></tr>";
 
-   echo "<tr class='tab_bg_1'>";
-   echo "<td align='center'>";
+    echo "<tr class='tab_bg_1'>";
+    echo "<td align='center'>";
 
-   $classesToUninstall = [
-      'PluginOktaConfig',
-      'PluginOktaProfile',
-   ];
+    $classesToUninstall = [
+        PluginOktaConfig::class,
+        PluginOktaProfile::class,
+    ];
 
-   foreach ($classesToUninstall as $class) {
-      if ($plug = isPluginItemType($class)) {
+    foreach ($classesToUninstall as $class) {
+        if (!call_user_func([$class, 'uninstall'])) {
+            return false;
+        }
+    }
 
-         $dir  = PLUGIN_OKTA_DIR . "/inc/";
-         $item = strtolower($plug['class']);
+    echo "</td>";
+    echo "</tr>";
+    echo "</table></center>";
 
-         if (file_exists("$dir$item.class.php")) {
-            include_once ("$dir$item.class.php");
-            if (!call_user_func([$class,'uninstall'])) {
-               return false;
-            }
-         }
-      }
-   }
-
-   echo "</td>";
-   echo "</tr>";
-   echo "</table></center>";
-
-   return true;
+    return true;
 }

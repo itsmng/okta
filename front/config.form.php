@@ -30,7 +30,8 @@
  * ---------------------------------------------------------------------
  */
 include("../../../inc/includes.php");
-require_once(PLUGIN_OKTA_DIR . "/inc/config.class.php");
+
+use GlpiPlugin\Okta\PluginOktaConfig;
 
 $plugin = new Plugin();
 
@@ -38,19 +39,19 @@ if($plugin->isActivated("okta")) {
     $config = new PluginOktaConfig();
     if(isset($_POST["update"]) || isset($_POST["import"])) {
         Session::checkRight("plugin_okta_config", UPDATE);
-        $config::updateConfigValues($_POST);
+        PluginOktaConfig::updateConfigValues($_POST);
         if (isset($_POST["import"])) {
             $group_regex = (isset($_POST['use_group_regex']) && $_POST['use_group_regex'] == 1) ? $_POST['group_regex'] : '^' . stripslashes($_POST['group']) . '$';
             if (empty($group_regex)) {
                 Session::addMessageAfterRedirect(__('Please provide a group regex', 'okta'), false, ERROR);
                 Html::back();
             }
-            $groups = $config::getGroupsByRegex($group_regex);
+            $groups = PluginOktaConfig::getGroupsByRegex($group_regex);
             if (!$groups) {
                 Session::addMessageAfterRedirect(sprintf(__('Invalid regex: %s', 'okta'), $_POST["group_regex"]), false, ERROR);
                 Html::back();
             }
-            $importedUsers = $config::importUser(
+            $importedUsers = PluginOktaConfig::importUser(
                 $groups,
                 $_POST['full_import'] == 1,
                 ($_POST['user'] == -1 ? NULL : $_POST['user'])
@@ -69,7 +70,7 @@ if($plugin->isActivated("okta")) {
         }
     } else if (isset($_GET["action"]) && $_GET["action"] == "getUsers" && isset($_GET["group"])) {
         $group = $_GET["group"];
-        $distantUsers = $config::getUsersInGroup($group);
+        $distantUsers = PluginOktaConfig::getUsersInGroup($group);
         if (!$distantUsers) {
             echo json_encode([]);
             die();
