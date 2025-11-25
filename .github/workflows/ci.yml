@@ -95,4 +95,9 @@ jobs:
           tools: composer:v2
 
       - name: Check PHP syntax
-        run: find src tests -name "*.php" -exec php -l {} \; | grep -v "No syntax errors"
+        run: |
+          errors=$(find src tests -name "*.php" -exec php -l {} \; 2>&1 | grep -v "No syntax errors" || true)
+          if [ -n "$errors" ]; then
+            echo "$errors"
+            exit 1
+          fi
