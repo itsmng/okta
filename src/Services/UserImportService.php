@@ -60,7 +60,7 @@ class UserImportService
         'email' => 'email',
         'phone_number' => 'mobilePhone',
         'preferred_username' => 'login',
-        'username' => 'login', // Alias for preferred_username
+        'username' => 'login',
         'manager' => 'manager',
     ];
 
@@ -73,7 +73,7 @@ class UserImportService
         'family_name' => 'realname',
         'phone_number' => 'phone',
         'email' => 'email',
-        'username' => 'name', // Alias for preferred_username
+        'username' => 'name',
         'manager' => 'users_id_supervisor'
     ];
 
@@ -132,9 +132,6 @@ class UserImportService
         if (!$userId) {
             $userList = $this->collectUsersFromGroups($authorizedGroups);
             
-            echo "Retrieved " . count($userList) . " users\n";
-            echo "Importing users...\n";
-            
             foreach ($userList as $user) {
                 $result = $this->createOrUpdateUser($user, $config, $fullImport);
                 if ($result) {
@@ -174,8 +171,6 @@ class UserImportService
     private function collectUsersFromGroups(array $authorizedGroups): array
     {
         $userList = [];
-        
-        echo "Retrieving users...\n";
         
         foreach ($authorizedGroups as $key => $group) {
             $usersInGroup = $this->groupService->getUsersInGroup($key);
@@ -360,8 +355,6 @@ class UserImportService
             return;
         }
 
-        echo "Resolving " . count($this->pendingManagerAssignments) . " pending manager assignments...\n";
-
         foreach ($this->pendingManagerAssignments as $userId => $managerEmail) {
             $managerId = $this->userRepository->findUserIdByEmail($managerEmail);
             
@@ -506,8 +499,6 @@ class UserImportService
             $userObject['users_id_supervisor'] = $managerId;
         }
     
-        // Filter out array values to avoid TypeError in DB->escape() which expects strings/scalars
-        // but keep the group array since addUserData handles it specially
         $userDataForOidc = array_filter($userObject, function($value) {
             return !is_array($value);
         });

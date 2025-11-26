@@ -56,6 +56,11 @@ class PluginOktaConfig extends CommonDBTM
      */
     public static $table = 'glpi_plugin_okta_configs';
 
+    public static function getTable($classname = null): string
+    {
+        return self::$table;
+    }
+
     /**
      * Install the plugin database table.
      *
@@ -334,23 +339,36 @@ SQL;
     /**
      * Cron task to import users from Okta.
      *
-     * @return bool
+     * @param CronTask|null $task The cron task instance (optional, for logging)
+     *
+     * @return int Number of actions performed (0 on failure, 1 on success)
      */
-    public static function cronImportOktaUsers(): bool
+    public static function cronImportOktaUsers(?CronTask $task = null): int
     {
         $config = self::getConfigValues();
         
         if ($config['use_group_regex']) {
-            $groups = self::getGroupsByRegex($config['group_regex']);
-            if (!$groups) {
-                return false;
-            }
+            $groupRegex = $config['group_regex'];
         } else {
-            $groups = [$config['group'] ?? ''];
+            $groupRegex = '^' . preg_quote(stripslashes($config['group'] ?? ''), '/') . '$';
         }
         
-        self::importUser($groups, (bool) $config['full_import']);
-        return true;
+        if (empty($groupRegex)) {
+            return 0;
+        }
+        
+        $groups = self::getGroupsByRegex($groupRegex);
+        if (!$groups) {
+            return 0;
+        }
+        
+        $importedUsers = self::importUser($groups, (bool) $config['full_import']);
+        
+        if ($task) {
+            $task->addVolume(count($importedUsers));
+        }
+        
+        return 1;
     }
 
     /**

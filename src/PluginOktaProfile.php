@@ -48,6 +48,11 @@ class PluginOktaProfile extends CommonDBTM
      */
     public static $table = 'glpi_plugin_okta_profiles';
 
+    public static function getTable($classname = null): string
+    {
+        return self::$table;
+    }
+
     /**
      * Install the plugin profile table.
      *
