@@ -233,17 +233,11 @@ class UserImportServiceTest extends TestCase
         // Simulate a pending assignment
         $this->invokePrivateMethod($service, 'addPendingManagerAssignment', [123, 'manager@example.com']);
         
-        // Capture output
-        ob_start();
         $this->invokePrivateMethod($service, 'resolvePendingManagerAssignments', []);
-        $output = ob_get_clean();
         
         // Verify the pending list is cleared
         $pending = $this->getPrivateProperty($service, 'pendingManagerAssignments');
         $this->assertEmpty($pending);
-        
-        // Verify output indicates success
-        $this->assertStringContainsString('Assigned manager for user ID 123', $output);
     }
 
     /**
@@ -273,13 +267,11 @@ class UserImportServiceTest extends TestCase
         // Simulate a pending assignment
         $this->invokePrivateMethod($service, 'addPendingManagerAssignment', [123, 'manager@example.com']);
         
-        // Capture output
-        ob_start();
         $this->invokePrivateMethod($service, 'resolvePendingManagerAssignments', []);
-        $output = ob_get_clean();
         
-        // Verify output indicates warning
-        $this->assertStringContainsString("Warning: Manager with email 'manager@example.com' not found", $output);
+        // Verify the pending list is cleared after processing
+        $pending = $this->getPrivateProperty($service, 'pendingManagerAssignments');
+        $this->assertEmpty($pending);
     }
 
     /**
@@ -327,13 +319,11 @@ class UserImportServiceTest extends TestCase
         $this->invokePrivateMethod($service, 'addPendingManagerAssignment', [200, 'manager2@example.com']);
         $this->invokePrivateMethod($service, 'addPendingManagerAssignment', [300, 'manager3@example.com']);
         
-        // Capture output
-        ob_start();
         $this->invokePrivateMethod($service, 'resolvePendingManagerAssignments', []);
-        $output = ob_get_clean();
         
-        // Verify all were processed
-        $this->assertStringContainsString('Resolving 3 pending manager assignments', $output);
+        // Verify all were processed - pending list should be empty
+        $pending = $this->getPrivateProperty($service, 'pendingManagerAssignments');
+        $this->assertEmpty($pending);
     }
 
     // =========================================================================
@@ -917,12 +907,11 @@ class UserImportServiceTest extends TestCase
         $this->invokePrivateMethod($service, 'addPendingManagerAssignment', [123, 'manager@example.com']);
         
         // Should not throw even without logger
-        ob_start();
         $this->invokePrivateMethod($service, 'resolvePendingManagerAssignments', []);
-        $output = ob_get_clean();
         
-        // Verify warning is still printed
-        $this->assertStringContainsString("Warning: Manager with email 'manager@example.com' not found", $output);
+        // Verify the pending list is cleared after processing
+        $pending = $this->getPrivateProperty($service, 'pendingManagerAssignments');
+        $this->assertEmpty($pending);
     }
 
     // =========================================================================

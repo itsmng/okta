@@ -360,7 +360,6 @@ class UserImportService
             
             if ($managerId !== null) {
                 $this->userRepository->updateSupervisor($userId, $managerId);
-                echo "  - Assigned manager for user ID {$userId}\n";
             } else {
                 // Log warning - manager still not found after second pass
                 $message = "Okta sync: Could not resolve manager for user ID {$userId}. " .
@@ -368,7 +367,6 @@ class UserImportService
                 if ($this->logger !== null) {
                     $this->logger->warning($message);
                 }
-                echo "  - Warning: Manager with email '{$managerEmail}' not found for user ID {$userId}\n";
             }
         }
 
