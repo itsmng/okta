@@ -19,7 +19,7 @@ jobs:
       - name: Build project
         run: |
           cd /home/runner/work/okta/
-          rm -r okta/.git* okta/tools
+          rm -r okta/.git* okta/tools okta/tests okta/composer.*
           tar -zcvf okta-${{ github.ref_name }}.tgz okta
 
       - name: Upload release
