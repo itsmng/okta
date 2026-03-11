@@ -197,6 +197,64 @@ class UserImportServiceTest extends TestCase
     }
 
     /**
+     * Test resolveManagerId uses configured manager email attribute.
+     */
+    public function testResolveManagerIdUsesConfiguredManagerEmailAttribute(): void
+    {
+        $this->mockUserRepository
+            ->expects($this->once())
+            ->method('findUserIdByEmail')
+            ->with('alt-manager@example.com')
+            ->willReturn(84);
+
+        $service = $this->createService();
+
+        $user = [
+            'id' => 'okta-user-1',
+            'email' => 'user@example.com',
+            'customManagerEmail' => 'alt-manager@example.com',
+        ];
+
+        $config = [
+            'manager_email_attribute' => 'customManagerEmail',
+        ];
+
+        $result = $this->invokePrivateMethod($service, 'resolveManagerId', [$user, $config]);
+
+        $this->assertSame(84, $result['managerId']);
+        $this->assertSame('alt-manager@example.com', $result['managerEmail']);
+    }
+
+    /**
+     * Test resolveManagerId falls back to managerId when configured attribute is empty.
+     */
+    public function testResolveManagerIdFallsBackToDefaultAttributeWhenConfiguredAttributeIsEmpty(): void
+    {
+        $this->mockUserRepository
+            ->expects($this->once())
+            ->method('findUserIdByEmail')
+            ->with('manager@example.com')
+            ->willReturn(42);
+
+        $service = $this->createService();
+
+        $user = [
+            'id' => 'okta-user-1',
+            'email' => 'user@example.com',
+            'managerId' => 'manager@example.com',
+        ];
+
+        $config = [
+            'manager_email_attribute' => '',
+        ];
+
+        $result = $this->invokePrivateMethod($service, 'resolveManagerId', [$user, $config]);
+
+        $this->assertSame(42, $result['managerId']);
+        $this->assertSame('manager@example.com', $result['managerEmail']);
+    }
+
+    /**
      * Test addPendingManagerAssignment stores assignment.
      */
     public function testAddPendingManagerAssignmentStoresData(): void

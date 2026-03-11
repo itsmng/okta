@@ -51,6 +51,8 @@ use GlpiPlugin\Okta\Services\UserImportService;
  */
 class PluginOktaConfig extends CommonDBTM
 {
+    private const DEFAULT_MANAGER_EMAIL_ATTRIBUTE = 'managerId';
+
     /**
      * @var string Table name
      */
@@ -116,7 +118,8 @@ SQL;
                   ('filter_family_name', ''),
                   ('filter_email', ''),
                   ('filter_phone_number', ''),
-                  ('ldap_update', '0')
+                  ('ldap_update', '0'),
+                  ('manager_email_attribute', 'managerId')
 SQL;
 
             $DB->queryOrDie($addquery, $DB->error());
@@ -182,7 +185,42 @@ SQL;
             $DB->queryOrDie($query, $DB->error());
         }
 
+        self::ensureDefaultConfigEntries();
+
         return true;
+    }
+
+    /**
+     * Ensure required config rows exist for current plugin features.
+     */
+    private static function ensureDefaultConfigEntries(): void
+    {
+        self::ensureConfigEntry('manager_email_attribute', self::DEFAULT_MANAGER_EMAIL_ATTRIBUTE);
+    }
+
+    /**
+     * Ensure one config entry exists.
+     *
+     * @param string $name         Config key
+     * @param string $defaultValue Default value if key is missing
+     */
+    private static function ensureConfigEntry(string $name, string $defaultValue): void
+    {
+        global $DB;
+
+        $table = self::getTable();
+        if (!$DB->tableExists($table)) {
+            return;
+        }
+
+        $query = "SELECT id FROM $table WHERE name='" . $DB->escape($name) . "' LIMIT 1";
+        $results = iterator_to_array($DB->query($query));
+        if (!empty($results)) {
+            return;
+        }
+
+        $insertQuery = "INSERT INTO $table (name, value) VALUES ('" . $DB->escape($name) . "', '" . $DB->escape($defaultValue) . "')";
+        $DB->queryOrDie($insertQuery, $DB->error());
     }
 
     /**
@@ -214,6 +252,7 @@ SQL;
         global $DB;
 
         $table = self::getTable();
+        self::ensureDefaultConfigEntries();
 
         $query = "SELECT name, value FROM $table";
         $results = iterator_to_array($DB->query($query));
@@ -456,6 +495,12 @@ SQL;
             echo "<option value='$k' $selected>$k (" . htmlspecialchars($value) . ")</option>";
         }
         echo "</select></td>";
+        echo "</tr>";
+
+        $managerEmailAttribute = $fields['manager_email_attribute'] ?? self::DEFAULT_MANAGER_EMAIL_ATTRIBUTE;
+        echo "<tr>";
+        echo "<td colspan='2'>" . __('Manager email attribute', 'okta') . "</td>";
+        echo "<td colspan='3'><input type='text' name='manager_email_attribute' value='" . htmlspecialchars($managerEmailAttribute) . "' placeholder='" . self::DEFAULT_MANAGER_EMAIL_ATTRIBUTE . "'></td>";
         echo "</tr>";
         
         // Normalization header

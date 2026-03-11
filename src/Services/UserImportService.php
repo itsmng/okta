@@ -268,7 +268,7 @@ class UserImportService
         }
 
         // Process manager - get both manager ID (if found) and email (for deferred resolution)
-        $managerResult = $this->resolveManagerId($user);
+        $managerResult = $this->resolveManagerId($user, $config);
         $managerId = $managerResult['managerId'];
         $managerEmail = $managerResult['managerEmail'];
 
@@ -326,13 +326,22 @@ class UserImportService
      * If the manager is not found, returns null and the manager email
      * should be stored for deferred resolution.
      *
-     * @param array $user The Okta user data
+     * @param array $user   The Okta user data
+     * @param array $config Plugin configuration values
      *
      * @return array{managerId: int|null, managerEmail: string|null} Manager resolution result
      */
-    private function resolveManagerId(array $user): array
+    private function resolveManagerId(array $user, array $config = []): array
     {
-        $managerEmail = $user['managerId'] ?? '';
+        $managerAttribute = trim((string)($config['manager_email_attribute'] ?? 'managerId'));
+        if ($managerAttribute === '') {
+            $managerAttribute = 'managerId';
+        }
+
+        $managerEmail = $user[$managerAttribute] ?? '';
+        if (!is_string($managerEmail)) {
+            return ['managerId' => null, 'managerEmail' => null];
+        }
         
         if (empty($managerEmail)) {
             return ['managerId' => null, 'managerEmail' => null];
