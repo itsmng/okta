@@ -1,0 +1,12 @@
+Source: okta
+Section: web
+Priority: standard
+Maintainer: ITSMng SysAdmin <sysadmin@itsm-ng.com>
+Build-Depends:	debhelper (>= 9)
+Rules-Requires-Root: no
+Homepage: https://github.com/itsmng/okta
+
+Package: itsm-ng-plugin-okta
+Architecture: all
+Depends: itsm-ng,
+Description: This is a plugin to import the users from a group in Okta to ITSM-NG.
