@@ -32,7 +32,7 @@
 
 use GlpiPlugin\Okta\PluginOktaProfile;
 
-define('PLUGIN_OKTA_VERSION', '1.7.1');
+define('PLUGIN_OKTA_VERSION', '1.7.2');
 
 if (!defined("PLUGIN_OKTA_DIR")) {
    define("PLUGIN_OKTA_DIR", Plugin::getPhpDir("okta"));
